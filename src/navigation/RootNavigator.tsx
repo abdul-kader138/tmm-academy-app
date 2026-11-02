@@ -21,40 +21,40 @@ const Tab = createBottomTabNavigator();
 
 const navTheme = {
   ...DefaultTheme,
-  dark: true,
+  dark: false,
   colors: {
     ...DefaultTheme.colors,
-    primary: Colors.primary,
-    background: Colors.background,
-    card: Colors.backgroundInput,
-    text: Colors.textPrimary,
-    border: Colors.border,
+    primary: Colors.signal,
+    background: Colors.canvas,
+    card: Colors.surface,
+    text: Colors.textMain,
+    border: Colors.borderSubtle,
   },
 };
 
 function BottomTabs() {
   const insets = useSafeAreaInsets();
   const bottomPadding = insets.bottom > 0 ? insets.bottom : (Platform.OS === 'android' ? 10 : 8);
-  const tabHeight = 60 + bottomPadding;
+  const tabHeight = 58 + bottomPadding;
 
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
         headerShown: false,
         tabBarStyle: {
-          backgroundColor: Colors.backgroundInput,
+          backgroundColor: Colors.surface,
           borderTopWidth: 1,
-          borderTopColor: Colors.border,
+          borderTopColor: Colors.borderSubtle,
           height: tabHeight,
           paddingBottom: bottomPadding,
           paddingTop: 8,
-          elevation: 8,
-          shadowColor: '#000',
+          elevation: 4,
+          shadowColor: '#0F172A',
           shadowOffset: { width: 0, height: -2 },
-          shadowOpacity: 0.15,
-          shadowRadius: 4,
+          shadowOpacity: 0.05,
+          shadowRadius: 6,
         },
-        tabBarActiveTintColor: Colors.primaryLight,
+        tabBarActiveTintColor: Colors.signal,
         tabBarInactiveTintColor: Colors.textMuted,
         tabBarLabelStyle: {
           fontSize: 11,
@@ -107,7 +107,7 @@ export const RootNavigator: React.FC = () => {
         initialRouteName="Welcome"
         screenOptions={{
           headerShown: false,
-          contentStyle: { backgroundColor: Colors.background },
+          contentStyle: { backgroundColor: Colors.canvas },
           animation: Platform.OS === 'ios' ? 'default' : 'slide_from_right',
         }}
       >
