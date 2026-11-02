@@ -45,7 +45,10 @@
         {
           "enforceContrast": false
         }
-      ]
+      ],
+      "expo-asset",
+      "expo-font",
+      "expo-status-bar"
     ]
   }
 }
