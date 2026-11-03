@@ -1,4 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Platform } from 'react-native';
+import { File as ExpoFile } from 'expo-file-system';
 import {
   Customer,
   AuthMeta,
@@ -456,49 +458,89 @@ class LmsApiClient {
 
   async uploadAvatar(imageUri: string): Promise<{ success: boolean; data?: Customer; error?: string }> {
     await this.ensureCsrf();
+
+    const rawFilename = imageUri.split('/').pop()?.split('?')[0] || `avatar_${Date.now()}.jpg`;
+    const match = /\.(\w+)$/.exec(rawFilename);
+    const ext = match ? match[1].toLowerCase() : 'jpg';
+    const type = ext === 'png' ? 'image/png' : ext === 'webp' ? 'image/webp' : 'image/jpeg';
+    const filename = rawFilename.includes('.') ? rawFilename : `avatar_${Date.now()}.${ext === 'png' ? 'png' : ext === 'webp' ? 'webp' : 'jpg'}`;
+
+    const normalizedUri = Platform.OS === 'ios' ? imageUri.replace('file://', '') : imageUri;
+
+    let filePart: any = null;
+    try {
+      filePart = new ExpoFile(imageUri);
+    } catch (_) {}
+
+    if (!filePart) {
+      try {
+        const localRes = await fetch(imageUri);
+        filePart = await localRes.blob();
+      } catch (_) {}
+    }
+
     const formData = new FormData();
-    const filename = imageUri.split('/').pop() || 'avatar.jpg';
-    const match = /\.(\w+)$/.exec(filename);
-    const type = match ? `image/${match[1]}` : 'image/jpeg';
+    if (filePart) {
+      formData.append('avatar', filePart, filename);
+    } else {
+      formData.append('avatar', {
+        uri: Platform.OS === 'ios' ? normalizedUri : imageUri,
+        name: filename,
+        type,
+      } as any);
+    }
 
-    formData.append('avatar', {
-      uri: imageUri,
-      name: filename,
-      type,
-    } as any);
+    const buildHeaders = (): Record<string, string> => {
+      const headers: Record<string, string> = {
+        Accept: 'application/json',
+        Referer: `${API_BASE_URL}/`,
+        Origin: API_BASE_URL,
+      };
 
-    const headers: Record<string, string> = {
-      Accept: 'application/json',
-      Referer: `${API_BASE_URL}/`,
-      Origin: API_BASE_URL,
+      if (this.token) {
+        headers.Authorization = `Bearer ${this.token}`;
+      }
+
+      const cookieHeader = this.getCookieHeader();
+      if (cookieHeader) {
+        headers.Cookie = cookieHeader;
+      }
+
+      if (this.xsrfToken) {
+        headers['X-XSRF-TOKEN'] = this.xsrfToken;
+      }
+      return headers;
     };
 
-    if (this.token) {
-      headers.Authorization = `Bearer ${this.token}`;
-    }
-
-    const cookieHeader = this.getCookieHeader();
-    if (cookieHeader) {
-      headers.Cookie = cookieHeader;
-    }
-
-    if (this.xsrfToken) {
-      headers['X-XSRF-TOKEN'] = this.xsrfToken;
-    }
-
     try {
-      const response = await fetch(`${API_BASE_URL}/api/v1/account/avatar`, {
+      let response = await fetch(`${API_BASE_URL}/api/v1/account/avatar`, {
         method: 'POST',
-        headers,
+        headers: buildHeaders(),
         body: formData,
       });
 
       this.parseAndStoreCookies(response);
-      const json = await response.json();
-      if (!response.ok) {
-        return { success: false, error: json.message || 'Avatar upload failed' };
+
+      // Handle 419 CSRF expiration retry
+      if (response.status === 419) {
+        await this.ensureCsrf();
+        response = await fetch(`${API_BASE_URL}/api/v1/account/avatar`, {
+          method: 'POST',
+          headers: buildHeaders(),
+          body: formData,
+        });
+        this.parseAndStoreCookies(response);
       }
-      return { success: true, data: json };
+
+      const data = await response.json().catch(() => null);
+      if (!response.ok) {
+        const errMsg =
+          data?.errors?.avatar?.[0] ||
+          data?.message ||
+          (response.status === 413 ? 'Image is too large (max 5MB).' : `Upload failed (${response.status})`);
+        return { success: false, error: errMsg };
+      }
+      return { success: true, data };
     } catch (err: any) {
       return { success: false, error: err.message || 'Connection failed' };
     }
