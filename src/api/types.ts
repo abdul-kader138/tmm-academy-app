@@ -151,3 +151,29 @@ export interface CourseReview {
   comment?: string;
   created_at: string;
 }
+
+export interface TwoFactorSetupResponse {
+  secret: string;
+  qr_code_svg: string;
+}
+
+export interface TwoFactorConfirmResponse {
+  message: string;
+  recovery_codes: string[];
+}
+
+export interface UpdateProfilePayload {
+  first_name?: string;
+  last_name?: string;
+  phone?: string | null;
+  phone_country?: string | null;
+  marketing_opt_in?: boolean;
+  email?: string;
+  locale?: 'en' | 'it' | 'bn' | null;
+}
+
+export interface ChangePasswordPayload {
+  current_password: string;
+  password: string;
+  password_confirmation: string;
+}

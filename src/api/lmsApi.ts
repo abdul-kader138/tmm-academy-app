@@ -11,6 +11,10 @@ import {
   LessonDetail,
   DashboardSummary,
   CertificateItem,
+  TwoFactorSetupResponse,
+  TwoFactorConfirmResponse,
+  UpdateProfilePayload,
+  ChangePasswordPayload,
 } from './types';
 import { getDeviceId, getDeviceName } from '../utils/deviceInfo';
 
@@ -435,14 +439,14 @@ class LmsApiClient {
   }
 
   // ==========================================
-  // ACCOUNT APIS
+  // ACCOUNT & 2FA APIS
   // ==========================================
   async getAccount(): Promise<Customer | null> {
     const res = await this.request<Customer>('/api/v1/account');
     return res.data || null;
   }
 
-  async updateAccount(payload: Partial<Customer>) {
+  async updateProfile(payload: UpdateProfilePayload) {
     await this.ensureCsrf();
     return this.request<Customer>('/api/v1/account', {
       method: 'PUT',
@@ -450,16 +454,78 @@ class LmsApiClient {
     });
   }
 
-  async changePassword(payload: {
-    current_password: string;
-    password: string;
-    password_confirmation: string;
-  }) {
+  async changePassword(payload: ChangePasswordPayload) {
     await this.ensureCsrf();
     return this.request<{ message: string }>('/api/v1/account/password', {
       method: 'PUT',
       body: JSON.stringify(payload),
     });
+  }
+
+  /**
+   * 2FA Step 1: Generate candidate secret and QR code SVG
+   */
+  async setupTwoFactor(): Promise<{ success: boolean; data?: TwoFactorSetupResponse; error?: string }> {
+    await this.ensureCsrf();
+    const res = await this.request<TwoFactorSetupResponse>('/api/v1/account/two-factor/setup', {
+      method: 'POST',
+    });
+    if (res.error) {
+      return { success: false, error: res.error };
+    }
+    return { success: true, data: res.data };
+  }
+
+  /**
+   * 2FA Step 2: Confirm candidate secret with 6-digit TOTP code, returns recovery codes
+   */
+  async confirmTwoFactor(
+    secret: string,
+    code: string
+  ): Promise<{ success: boolean; data?: TwoFactorConfirmResponse; error?: string }> {
+    await this.ensureCsrf();
+    const res = await this.request<TwoFactorConfirmResponse>('/api/v1/account/two-factor/confirm', {
+      method: 'POST',
+      body: JSON.stringify({ secret, code }),
+    });
+    if (res.error) {
+      return { success: false, error: res.error };
+    }
+    return { success: true, data: res.data };
+  }
+
+  /**
+   * 2FA: Regenerate backup recovery codes (password-gated)
+   */
+  async regenerateTwoFactorRecoveryCodes(
+    password: string
+  ): Promise<{ success: boolean; data?: TwoFactorConfirmResponse; error?: string }> {
+    await this.ensureCsrf();
+    const res = await this.request<TwoFactorConfirmResponse>('/api/v1/account/two-factor/recovery-codes', {
+      method: 'POST',
+      body: JSON.stringify({ password }),
+    });
+    if (res.error) {
+      return { success: false, error: res.error };
+    }
+    return { success: true, data: res.data };
+  }
+
+  /**
+   * 2FA: Disable Two-Factor Authentication (password-gated)
+   */
+  async disableTwoFactor(
+    password: string
+  ): Promise<{ success: boolean; message?: string; error?: string }> {
+    await this.ensureCsrf();
+    const res = await this.request<{ message: string }>('/api/v1/account/two-factor', {
+      method: 'DELETE',
+      body: JSON.stringify({ password }),
+    });
+    if (res.error) {
+      return { success: false, error: res.error };
+    }
+    return { success: true, message: res.data?.message };
   }
 
   async exportAccountData(): Promise<{ success: boolean; data?: any; error?: string }> {

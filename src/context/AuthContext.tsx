@@ -1,5 +1,12 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { Customer, RegisterPayload } from '../api/types';
+import {
+  Customer,
+  RegisterPayload,
+  UpdateProfilePayload,
+  ChangePasswordPayload,
+  TwoFactorSetupResponse,
+  TwoFactorConfirmResponse,
+} from '../api/types';
 import { lmsApi } from '../api/lmsApi';
 
 interface AuthContextType {
@@ -21,6 +28,12 @@ interface AuthContextType {
   register: (payload: RegisterPayload) => Promise<{ success: boolean; message?: string; error?: string }>;
   forgotPassword: (email: string) => Promise<{ success: boolean; message?: string; error?: string }>;
   resendVerification: () => Promise<{ success: boolean; message?: string; error?: string }>;
+  updateProfile: (payload: UpdateProfilePayload) => Promise<{ success: boolean; error?: string }>;
+  changePassword: (payload: ChangePasswordPayload) => Promise<{ success: boolean; message?: string; error?: string }>;
+  setup2FA: () => Promise<{ success: boolean; data?: TwoFactorSetupResponse; error?: string }>;
+  confirm2FA: (secret: string, code: string) => Promise<{ success: boolean; data?: TwoFactorConfirmResponse; error?: string }>;
+  disable2FA: (password: string) => Promise<{ success: boolean; message?: string; error?: string }>;
+  regenerateRecoveryCodes: (password: string) => Promise<{ success: boolean; data?: TwoFactorConfirmResponse; error?: string }>;
   logout: () => Promise<void>;
   refreshUser: () => Promise<void>;
 }
@@ -33,6 +46,12 @@ const AuthContext = createContext<AuthContextType>({
   register: async () => ({ success: false }),
   forgotPassword: async () => ({ success: false }),
   resendVerification: async () => ({ success: false }),
+  updateProfile: async () => ({ success: false }),
+  changePassword: async () => ({ success: false }),
+  setup2FA: async () => ({ success: false }),
+  confirm2FA: async () => ({ success: false }),
+  disable2FA: async () => ({ success: false }),
+  regenerateRecoveryCodes: async () => ({ success: false }),
   logout: async () => {},
   refreshUser: async () => {},
 });
@@ -118,6 +137,49 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return { success: true, message: res.data?.message || 'Link resent' };
   };
 
+  const updateProfile = async (payload: UpdateProfilePayload) => {
+    const res = await lmsApi.updateProfile(payload);
+    if (res.error) {
+      return { success: false, error: res.error };
+    }
+    if (res.data) {
+      setUser(res.data);
+    }
+    return { success: true };
+  };
+
+  const changePassword = async (payload: ChangePasswordPayload) => {
+    const res = await lmsApi.changePassword(payload);
+    if (res.error) {
+      return { success: false, error: res.error };
+    }
+    return { success: true, message: res.data?.message || 'Password updated' };
+  };
+
+  const setup2FA = async () => {
+    return lmsApi.setupTwoFactor();
+  };
+
+  const confirm2FA = async (secret: string, code: string) => {
+    const res = await lmsApi.confirmTwoFactor(secret, code);
+    if (res.success) {
+      await refreshUser();
+    }
+    return res;
+  };
+
+  const disable2FA = async (password: string) => {
+    const res = await lmsApi.disableTwoFactor(password);
+    if (res.success) {
+      await refreshUser();
+    }
+    return res;
+  };
+
+  const regenerateRecoveryCodes = async (password: string) => {
+    return lmsApi.regenerateTwoFactorRecoveryCodes(password);
+  };
+
   const logout = async () => {
     await lmsApi.logout();
     setUser(null);
@@ -138,6 +200,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         register,
         forgotPassword,
         resendVerification,
+        updateProfile,
+        changePassword,
+        setup2FA,
+        confirm2FA,
+        disable2FA,
+        regenerateRecoveryCodes,
         logout,
         refreshUser,
       }}
