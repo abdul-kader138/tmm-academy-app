@@ -538,20 +538,28 @@ class LmsApiClient {
     };
   }
 
-  async getLesson(courseSlug: string, lessonSlug: string): Promise<LessonDetail | null> {
-    const res = await this.request<LessonDetail>(`/api/v1/courses/${courseSlug}/lessons/${lessonSlug}`);
-    return res.data || null;
+  async getLesson(courseSlug: string, lessonIdOrSlug: string | number): Promise<LessonDetail | null> {
+    const res = await this.request<any>(`/api/v1/courses/${courseSlug}/lessons/${lessonIdOrSlug}`);
+    if (!res.data) return null;
+    const lesson = res.data.lesson || res.data.data || res.data;
+    if (lesson && typeof lesson === 'object') {
+      if (Array.isArray(res.data.comments)) {
+        lesson.comments = res.data.comments;
+      }
+    }
+    return lesson as LessonDetail;
   }
 
-  async reportWatchProgress(courseSlug: string, lessonSlug: string, watched_seconds: number) {
-    return this.request(`/api/v1/courses/${courseSlug}/lessons/${lessonSlug}/progress`, {
+  async reportWatchProgress(courseSlug: string, lessonIdOrSlug: string | number, watched_seconds: number) {
+    return this.request(`/api/v1/courses/${courseSlug}/lessons/${lessonIdOrSlug}/progress`, {
       method: 'POST',
       body: JSON.stringify({ watched_seconds }),
     });
   }
 
-  async markLessonComplete(courseSlug: string, lessonSlug: string) {
-    return this.request(`/api/v1/courses/${courseSlug}/lessons/${lessonSlug}/complete`, {
+  async markLessonComplete(courseSlug: string, lessonIdOrSlug: string | number) {
+    await this.ensureCsrf();
+    return this.request(`/api/v1/courses/${courseSlug}/lessons/${lessonIdOrSlug}/complete`, {
       method: 'POST',
     });
   }

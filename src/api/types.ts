@@ -88,23 +88,31 @@ export interface CourseSection {
 
 export interface LessonSummary {
   id: number;
-  slug: string;
+  slug?: string;
   title: string;
-  duration_seconds: number;
+  duration_minutes?: number;
+  duration_seconds?: number;
   is_completed: boolean;
-  order: number;
+  order?: number;
+  sort_order?: number;
 }
 
 export interface LessonDetail {
   id: number;
-  slug: string;
+  slug?: string;
   title: string;
-  video_url: string;
-  duration_seconds: number;
-  watched_seconds: number;
-  completed: boolean;
+  summary?: string;
   description?: string;
-  comments: LessonComment[];
+  video_url?: string;
+  vimeo_id?: string | number;
+  duration_minutes?: number;
+  duration_seconds?: number;
+  watched_seconds?: number;
+  is_completed?: boolean;
+  completed?: boolean;
+  prev_lesson_id?: number | null;
+  next_lesson_id?: number | null;
+  comments?: LessonComment[];
 }
 
 export interface LessonComment {

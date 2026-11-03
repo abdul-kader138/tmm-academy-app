@@ -150,7 +150,20 @@ export const CourseDetailScreen: React.FC<{ route: any; navigation: any }> = ({
                 <View key={sec.id || idx} style={[styles.sectionCard, cardShadow(1)]}>
                   <Text style={styles.sectionTitle}>{sec.title}</Text>
                   {sec.lessons.map((les) => (
-                    <View key={les.id} style={styles.lessonRow}>
+                    <TouchableOpacity
+                      key={les.id}
+                      style={styles.lessonRow}
+                      activeOpacity={course.is_enrolled ? 0.7 : 1}
+                      onPress={() => {
+                        if (course.is_enrolled) {
+                          navigation.navigate('LessonPlayer', {
+                            courseSlug: course.slug,
+                            lessonId: les.id,
+                            courseTitle: course.title,
+                          });
+                        }
+                      }}
+                    >
                       <Ionicons
                         name={les.is_completed ? 'checkmark-circle' : 'play-circle-outline'}
                         size={18}
@@ -162,7 +175,10 @@ export const CourseDetailScreen: React.FC<{ route: any; navigation: any }> = ({
                           ? `${(les as any).duration_minutes}m`
                           : `${Math.floor((les.duration_seconds || 0) / 60)}m`}
                       </Text>
-                    </View>
+                      {course.is_enrolled && (
+                        <Ionicons name="chevron-forward" size={14} color={Colors.textMuted} />
+                      )}
+                    </TouchableOpacity>
                   ))}
                 </View>
               ))}
@@ -197,7 +213,27 @@ export const CourseDetailScreen: React.FC<{ route: any; navigation: any }> = ({
           activeOpacity={0.85}
           onPress={() => {
             if (course.is_enrolled) {
-              navigation.navigate('MainTabs', { screen: 'DashboardTab' });
+              // Find first incomplete lesson, or first lesson
+              let targetLessonId: number | string | null = null;
+              if (detail?.sections) {
+                for (const sec of detail.sections) {
+                  if (sec.lessons && sec.lessons.length > 0) {
+                    const incomplete = sec.lessons.find((l) => !l.is_completed);
+                    targetLessonId = incomplete ? incomplete.id : sec.lessons[0].id;
+                    break;
+                  }
+                }
+              }
+
+              if (targetLessonId) {
+                navigation.navigate('LessonPlayer', {
+                  courseSlug: course.slug,
+                  lessonId: targetLessonId,
+                  courseTitle: course.title,
+                });
+              } else {
+                Alert.alert('Notice', 'No lessons available for this course yet.');
+              }
             } else if (user) {
               Alert.alert(
                 'Enroll in Course',
