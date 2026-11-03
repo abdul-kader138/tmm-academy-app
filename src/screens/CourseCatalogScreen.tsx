@@ -16,9 +16,11 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors, cardShadow } from '../theme/colors';
 import { lmsApi, API_BASE_URL } from '../api/lmsApi';
 import { CourseCatalogItem } from '../api/types';
+import { useAuth } from '../context/AuthContext';
 
 export const CourseCatalogScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   const insets = useSafeAreaInsets();
+  const { user } = useAuth();
   const [courses, setCourses] = useState<CourseCatalogItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -126,8 +128,30 @@ export const CourseCatalogScreen: React.FC<{ navigation: any }> = ({ navigation 
           },
         ]}
       >
-        <Text style={styles.screenTitle}>Explore Courses</Text>
-        <Text style={styles.screenSubtitle}>Practical tracks for career advancement</Text>
+        <View style={styles.headerTopRow}>
+          {navigation.canGoBack() && (
+            <TouchableOpacity
+              style={styles.headerBackBtn}
+              onPress={() => navigation.goBack()}
+              activeOpacity={0.7}
+            >
+              <Ionicons name="arrow-back" size={22} color={Colors.textMain} />
+            </TouchableOpacity>
+          )}
+          <View style={styles.headerTitlesCol}>
+            <Text style={styles.screenTitle}>Explore Courses</Text>
+            <Text style={styles.screenSubtitle}>Practical tracks for career advancement</Text>
+          </View>
+          {!user && (
+            <TouchableOpacity
+              style={styles.headerSignInBtn}
+              onPress={() => navigation.navigate('Login')}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.headerSignInText}>Sign In</Text>
+            </TouchableOpacity>
+          )}
+        </View>
 
         {/* Search Bar */}
         <View style={styles.searchContainer}>
@@ -195,6 +219,36 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: Colors.borderSubtle,
   },
+  headerTopRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+    gap: 12,
+  },
+  headerBackBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: Colors.surfaceElevated,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  headerTitlesCol: {
+    flex: 1,
+  },
+  headerSignInBtn: {
+    backgroundColor: 'rgba(236, 254, 255, 0.95)',
+    borderColor: 'rgba(14, 116, 144, 0.25)',
+    borderWidth: 1,
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+    borderRadius: 10,
+  },
+  headerSignInText: {
+    color: Colors.signal,
+    fontSize: 13,
+    fontWeight: '700',
+  },
   screenTitle: {
     color: Colors.textMain,
     fontSize: 22,
@@ -205,7 +259,6 @@ const styles = StyleSheet.create({
     color: Colors.textSecondary,
     fontSize: 13,
     marginTop: 2,
-    marginBottom: 12,
   },
   searchContainer: {
     flexDirection: 'row',

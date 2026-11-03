@@ -38,7 +38,6 @@ const navTheme = {
 
 function BottomTabs() {
   const insets = useSafeAreaInsets();
-  const { user } = useAuth();
   const bottomPadding = insets.bottom > 0 ? insets.bottom : (Platform.OS === 'android' ? 10 : 8);
   const tabHeight = 58 + bottomPadding;
 
@@ -76,8 +75,6 @@ function BottomTabs() {
             iconName = focused ? 'ribbon' : 'ribbon-outline';
           } else if (route.name === 'AccountTab') {
             iconName = focused ? 'person' : 'person-outline';
-          } else if (route.name === 'LoginTab') {
-            iconName = focused ? 'log-in' : 'log-in-outline';
           }
           return <Ionicons name={iconName} size={size} color={color} />;
         },
@@ -88,46 +85,32 @@ function BottomTabs() {
         component={CourseCatalogScreen}
         options={{ tabBarLabel: 'Courses' }}
       />
-      {user ? (
-        <>
-          <Tab.Screen
-            name="DashboardTab"
-            component={DashboardScreen}
-            options={{ tabBarLabel: 'Dashboard' }}
-          />
-          <Tab.Screen
-            name="CertificatesTab"
-            component={CertificatesScreen}
-            options={{ tabBarLabel: 'Certificates' }}
-          />
-          <Tab.Screen
-            name="AccountTab"
-            component={AccountScreen}
-            options={{ tabBarLabel: 'Account' }}
-          />
-        </>
-      ) : (
-        <Tab.Screen
-          name="LoginTab"
-          component={LoginScreen}
-          options={{ tabBarLabel: 'Sign In' }}
-          listeners={({ navigation }) => ({
-            tabPress: (e) => {
-              e.preventDefault();
-              navigation.navigate('Login');
-            },
-          })}
-        />
-      )}
+      <Tab.Screen
+        name="DashboardTab"
+        component={DashboardScreen}
+        options={{ tabBarLabel: 'Dashboard' }}
+      />
+      <Tab.Screen
+        name="CertificatesTab"
+        component={CertificatesScreen}
+        options={{ tabBarLabel: 'Certificates' }}
+      />
+      <Tab.Screen
+        name="AccountTab"
+        component={AccountScreen}
+        options={{ tabBarLabel: 'Account' }}
+      />
     </Tab.Navigator>
   );
 }
 
 export const RootNavigator: React.FC = () => {
+  const { user } = useAuth();
+
   return (
     <NavigationContainer theme={navTheme}>
       <Stack.Navigator
-        initialRouteName="Welcome"
+        initialRouteName={user ? 'MainTabs' : 'Welcome'}
         screenOptions={{
           headerShown: false,
           contentStyle: { backgroundColor: Colors.canvas },
@@ -135,7 +118,10 @@ export const RootNavigator: React.FC = () => {
         }}
       >
         <Stack.Screen name="Welcome" component={WelcomeScreen} />
-        <Stack.Screen name="MainTabs" component={BottomTabs} />
+        {user ? (
+          <Stack.Screen name="MainTabs" component={BottomTabs} />
+        ) : null}
+        <Stack.Screen name="CourseCatalog" component={CourseCatalogScreen} />
         <Stack.Screen name="CourseDetail" component={CourseDetailScreen} />
         <Stack.Screen name="Login" component={LoginScreen} />
         <Stack.Screen name="EditProfile" component={EditProfileScreen} />

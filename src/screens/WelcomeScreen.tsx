@@ -13,12 +13,22 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors, cardShadow } from '../theme/colors';
+import { useAuth } from '../context/AuthContext';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 export const WelcomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   const insets = useSafeAreaInsets();
+  const { user } = useAuth();
   const floatAnim = useRef(new Animated.Value(0)).current;
+
+  const handleOpenCourses = () => {
+    if (user) {
+      navigation.navigate('MainTabs', { screen: 'CatalogTab' });
+    } else {
+      navigation.navigate('CourseCatalog');
+    }
+  };
 
   useEffect(() => {
     // Subtle breathing float for the hero illustration
@@ -121,7 +131,7 @@ export const WelcomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => 
           <View style={styles.actionRow}>
             <TouchableOpacity
               style={[styles.primaryBrowseBtn, cardShadow(2)]}
-              onPress={() => navigation.navigate('MainTabs')}
+              onPress={handleOpenCourses}
               activeOpacity={0.85}
             >
               <Text style={styles.primaryBrowseText}>Browse Courses</Text>
@@ -200,28 +210,28 @@ export const WelcomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => 
           >
             <TouchableOpacity
               style={[styles.filterPill, styles.filterPillActive]}
-              onPress={() => navigation.navigate('MainTabs')}
+              onPress={handleOpenCourses}
             >
               <Text style={[styles.filterPillText, styles.filterPillTextActive]}>All courses</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
               style={styles.filterPill}
-              onPress={() => navigation.navigate('MainTabs')}
+              onPress={handleOpenCourses}
             >
               <Text style={styles.filterPillText}>TOP Courses</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
               style={styles.filterPill}
-              onPress={() => navigation.navigate('MainTabs')}
+              onPress={handleOpenCourses}
             >
               <Text style={styles.filterPillText}>New-পেশাদার কোর্স</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
               style={styles.filterPill}
-              onPress={() => navigation.navigate('MainTabs')}
+              onPress={handleOpenCourses}
             >
               <Text style={styles.filterPillText}>Advance & Popular Course</Text>
             </TouchableOpacity>
@@ -247,7 +257,7 @@ export const WelcomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => 
             <TouchableOpacity
               key={item.id}
               style={[styles.trackCard, cardShadow(1)]}
-              onPress={() => navigation.navigate('MainTabs')}
+              onPress={handleOpenCourses}
               activeOpacity={0.88}
             >
               <View style={[styles.trackBadge, { backgroundColor: item.badgeBg }]}>
