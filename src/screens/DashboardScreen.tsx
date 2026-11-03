@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -12,9 +12,10 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useFocusEffect } from '@react-navigation/native';
 import { Colors, cardShadow } from '../theme/colors';
 import { lmsApi, normalizeAvatarUrl } from '../api/lmsApi';
-import { DashboardSummary } from '../api/types';
+import { DashboardSummary, CourseCatalogItem } from '../api/types';
 import { useAuth } from '../context/AuthContext';
 
 export const DashboardScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
@@ -29,7 +30,8 @@ export const DashboardScreen: React.FC<{ navigation: any }> = ({ navigation }) =
     setAvatarLoadFailed(false);
   }, [user?.avatar_url]);
 
-  const fetchDashboard = async () => {
+  const fetchDashboard = useCallback(async (isSilent = false) => {
+    if (!isSilent) setLoading(true);
     try {
       const data = await lmsApi.getDashboard();
       setDashboard(data);
@@ -39,25 +41,30 @@ export const DashboardScreen: React.FC<{ navigation: any }> = ({ navigation }) =
       setLoading(false);
       setRefreshing(false);
     }
-  };
+  }, []);
 
-  useEffect(() => {
-    if (user) {
-      void fetchDashboard();
-    } else {
-      setLoading(false);
-    }
-  }, [user]);
+  // Automatically refresh whenever screen comes into focus
+  useFocusEffect(
+    useCallback(() => {
+      if (user) {
+        // If we already have dashboard data, refresh silently in the background
+        void fetchDashboard(Boolean(dashboard));
+      } else {
+        setLoading(false);
+      }
+    }, [user, fetchDashboard, Boolean(dashboard)])
+  );
 
   const onRefresh = () => {
     if (user) {
       setRefreshing(true);
-      void fetchDashboard();
+      void fetchDashboard(true);
     }
   };
 
   const streakDays = dashboard?.streak_summary?.streak_days || 0;
-  const enrolledCourses = dashboard?.enrolled_courses || [];
+  const enrolledCourses: CourseCatalogItem[] =
+    dashboard?.enrolled_courses || (dashboard as any)?.courses || [];
   const certificateCount = dashboard?.certificates?.length || 0;
 
   if (!user) {

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -13,6 +13,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useFocusEffect } from '@react-navigation/native';
 import { Colors, cardShadow } from '../theme/colors';
 import { lmsApi, API_BASE_URL } from '../api/lmsApi';
 import { CourseCatalogItem } from '../api/types';
@@ -24,7 +25,8 @@ export const CourseCatalogScreen: React.FC<{ navigation: any }> = ({ navigation 
   const [refreshing, setRefreshing] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
 
-  const fetchCourses = async () => {
+  const fetchCourses = useCallback(async (isSilent = false) => {
+    if (!isSilent) setLoading(true);
     try {
       const data = await lmsApi.getCourses();
       setCourses(data);
@@ -34,15 +36,18 @@ export const CourseCatalogScreen: React.FC<{ navigation: any }> = ({ navigation 
       setLoading(false);
       setRefreshing(false);
     }
-  };
-
-  useEffect(() => {
-    void fetchCourses();
   }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      // Refresh silently on focus so enrollments update immediately
+      void fetchCourses(courses.length > 0);
+    }, [fetchCourses, courses.length])
+  );
 
   const onRefresh = () => {
     setRefreshing(true);
-    void fetchCourses();
+    void fetchCourses(true);
   };
 
   const filteredCourses = courses.filter((c) =>

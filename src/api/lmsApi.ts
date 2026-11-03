@@ -13,6 +13,7 @@ import {
   LessonDetail,
   DashboardSummary,
   CertificateItem,
+  ActivitySummary,
   TwoFactorSetupResponse,
   TwoFactorConfirmResponse,
   UpdateProfilePayload,
@@ -444,18 +445,59 @@ class LmsApiClient {
   // LEARNER & COURSES APIS
   // ==========================================
   async getCourses(): Promise<CourseCatalogItem[]> {
-    const res = await this.request<{ courses: CourseCatalogItem[] }>('/api/v1/courses');
-    return res.data?.courses || [];
+    const res = await this.request<any>('/api/v1/courses');
+    if (!res.data) return [];
+    if (Array.isArray(res.data.courses)) return res.data.courses;
+    if (Array.isArray(res.data.data)) return res.data.data;
+    if (Array.isArray(res.data)) return res.data;
+    return [];
   }
 
   async getCourseDetail(courseSlug: string): Promise<CourseDetail | null> {
-    const res = await this.request<CourseDetail>(`/api/v1/courses/${courseSlug}`);
-    return res.data || null;
+    const res = await this.request<any>(`/api/v1/courses/${courseSlug}`);
+    if (!res.data) return null;
+    const data = res.data.course || res.data.data || res.data;
+    // An active enrollment is required for 200 OK under App\Services\Lms\CourseAccessGuard
+    if (data && typeof data === 'object') {
+      data.is_enrolled = true;
+    }
+    return data as CourseDetail;
   }
 
   async getDashboard(): Promise<DashboardSummary | null> {
-    const res = await this.request<DashboardSummary>('/api/v1/dashboard');
-    return res.data || null;
+    const res = await this.request<any>('/api/v1/dashboard');
+    if (!res.data) return null;
+
+    const raw = res.data;
+    const payload = raw.data || raw.dashboard || raw;
+
+    const enrolled_courses: CourseCatalogItem[] =
+      payload.enrolled_courses ||
+      payload.courses ||
+      payload.enrolledCourses ||
+      (Array.isArray(payload) ? payload : []);
+
+    const certificates: CertificateItem[] =
+      payload.certificates ||
+      [];
+
+    const pending_checkpoints: ActivitySummary[] =
+      payload.pending_checkpoints ||
+      payload.pendingCheckpoints ||
+      payload.checkpoints ||
+      [];
+
+    const streak_summary =
+      payload.streak_summary ||
+      payload.streakSummary ||
+      { streak_days: 0, active_dates: [] };
+
+    return {
+      enrolled_courses,
+      certificates,
+      pending_checkpoints,
+      streak_summary,
+    };
   }
 
   async getLesson(courseSlug: string, lessonSlug: string): Promise<LessonDetail | null> {
@@ -477,8 +519,12 @@ class LmsApiClient {
   }
 
   async getCertificates(): Promise<CertificateItem[]> {
-    const res = await this.request<{ certificates: CertificateItem[] }>('/api/v1/certificates');
-    return res.data?.certificates || [];
+    const res = await this.request<any>('/api/v1/certificates');
+    if (!res.data) return [];
+    if (Array.isArray(res.data.certificates)) return res.data.certificates;
+    if (Array.isArray(res.data.data)) return res.data.data;
+    if (Array.isArray(res.data)) return res.data;
+    return [];
   }
 
   getCertificateDownloadUrl(certificateId: number | string): string {

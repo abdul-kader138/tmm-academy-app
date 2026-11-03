@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useFocusEffect } from '@react-navigation/native';
 import { Colors, cardShadow } from '../theme/colors';
 import { lmsApi } from '../api/lmsApi';
 import { CertificateItem } from '../api/types';
@@ -23,7 +24,8 @@ export const CertificatesScreen: React.FC<{ navigation?: any }> = ({ navigation 
   const [certificates, setCertificates] = useState<CertificateItem[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const fetchCertificates = async () => {
+  const fetchCertificates = useCallback(async (isSilent = false) => {
+    if (!isSilent) setLoading(true);
     try {
       const certs = await lmsApi.getCertificates();
       setCertificates(certs);
@@ -32,15 +34,17 @@ export const CertificatesScreen: React.FC<{ navigation?: any }> = ({ navigation 
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
-  useEffect(() => {
-    if (user) {
-      void fetchCertificates();
-    } else {
-      setLoading(false);
-    }
-  }, [user]);
+  useFocusEffect(
+    useCallback(() => {
+      if (user) {
+        void fetchCertificates(certificates.length > 0);
+      } else {
+        setLoading(false);
+      }
+    }, [user, fetchCertificates, certificates.length])
+  );
 
   const handleDownload = async (cert: CertificateItem) => {
     const downloadUrl = lmsApi.getCertificateDownloadUrl(cert.id);
