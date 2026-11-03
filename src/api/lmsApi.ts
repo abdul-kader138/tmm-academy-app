@@ -446,6 +446,7 @@ class LmsApiClient {
   // ==========================================
   async getCourses(): Promise<CourseCatalogItem[]> {
     const res = await this.request<any>('/api/v1/courses');
+    console.log('[lmsApi] getCourses status:', res.status, 'hasData:', Boolean(res.data));
     if (!res.data) return [];
     if (Array.isArray(res.data.courses)) return res.data.courses;
     if (Array.isArray(res.data.data)) return res.data.data;
@@ -455,6 +456,7 @@ class LmsApiClient {
 
   async getCourseDetail(courseSlug: string): Promise<CourseDetail | null> {
     const res = await this.request<any>(`/api/v1/courses/${courseSlug}`);
+    console.log('[lmsApi] getCourseDetail status:', res.status, 'for slug:', courseSlug);
     if (!res.data) return null;
     const data = res.data.course || res.data.data || res.data;
     // An active enrollment is required for 200 OK under App\Services\Lms\CourseAccessGuard
@@ -466,6 +468,10 @@ class LmsApiClient {
 
   async getDashboard(): Promise<DashboardSummary | null> {
     const res = await this.request<any>('/api/v1/dashboard');
+    console.log('[lmsApi] getDashboard status:', res.status, 'error:', res.error);
+    if (res.data) {
+      console.log('[lmsApi] getDashboard raw payload keys:', Object.keys(res.data));
+    }
     if (!res.data) return null;
 
     const raw = res.data;
@@ -476,6 +482,8 @@ class LmsApiClient {
       payload.courses ||
       payload.enrolledCourses ||
       (Array.isArray(payload) ? payload : []);
+
+    console.log('[lmsApi] getDashboard resolved enrolled_courses length:', enrolled_courses.length);
 
     const certificates: CertificateItem[] =
       payload.certificates ||

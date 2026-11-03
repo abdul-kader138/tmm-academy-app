@@ -68,11 +68,13 @@ export const CourseCatalogScreen: React.FC<{ navigation: any }> = ({ navigation 
         style={[styles.courseCard, cardShadow(2)]}
         onPress={() => navigation.navigate('CourseDetail', { course: item })}
       >
-        <Image
-          source={{ uri: imageUrl }}
-          style={styles.courseImage}
-          resizeMode="cover"
-        />
+        {Boolean(imageUrl) && (
+          <Image
+            source={{ uri: imageUrl }}
+            style={styles.courseImage}
+            resizeMode="cover"
+          />
+        )}
 
         <View style={styles.cardContent}>
           {item.eyebrow ? (

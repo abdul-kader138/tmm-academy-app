@@ -118,9 +118,7 @@ export const RootNavigator: React.FC = () => {
         }}
       >
         <Stack.Screen name="Welcome" component={WelcomeScreen} />
-        {user ? (
-          <Stack.Screen name="MainTabs" component={BottomTabs} />
-        ) : null}
+        <Stack.Screen name="MainTabs" component={BottomTabs} />
         <Stack.Screen name="CourseCatalog" component={CourseCatalogScreen} />
         <Stack.Screen name="CourseDetail" component={CourseDetailScreen} />
         <Stack.Screen name="Login" component={LoginScreen} />

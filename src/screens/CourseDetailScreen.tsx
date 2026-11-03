@@ -55,7 +55,9 @@ export const CourseDetailScreen: React.FC<{ route: any; navigation: any }> = ({
 
       {/* Cover Header (Fixed at top) */}
       <View style={styles.coverWrapper}>
-        <Image source={{ uri: imageUrl }} style={styles.coverImage} resizeMode="cover" />
+        {Boolean(imageUrl) && (
+          <Image source={{ uri: imageUrl }} style={styles.coverImage} resizeMode="cover" />
+        )}
         <LinearGradient
           colors={['rgba(15, 23, 42, 0.15)', 'rgba(15, 23, 42, 0.85)']}
           style={StyleSheet.absoluteFill}
