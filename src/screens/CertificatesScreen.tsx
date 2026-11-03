@@ -15,9 +15,11 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors, cardShadow } from '../theme/colors';
 import { lmsApi } from '../api/lmsApi';
 import { CertificateItem } from '../api/types';
+import { useAuth } from '../context/AuthContext';
 
 export const CertificatesScreen: React.FC<{ navigation?: any }> = ({ navigation }) => {
   const insets = useSafeAreaInsets();
+  const { user } = useAuth();
   const [certificates, setCertificates] = useState<CertificateItem[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -33,8 +35,12 @@ export const CertificatesScreen: React.FC<{ navigation?: any }> = ({ navigation 
   };
 
   useEffect(() => {
-    void fetchCertificates();
-  }, []);
+    if (user) {
+      void fetchCertificates();
+    } else {
+      setLoading(false);
+    }
+  }, [user]);
 
   const handleDownload = async (cert: CertificateItem) => {
     const downloadUrl = lmsApi.getCertificateDownloadUrl(cert.id);
@@ -49,6 +55,40 @@ export const CertificatesScreen: React.FC<{ navigation?: any }> = ({ navigation 
       Alert.alert('Download Error', 'Could not open certificate download link.');
     }
   };
+
+  if (!user) {
+    return (
+      <View
+        style={[
+          styles.container,
+          {
+            paddingTop: insets.top + (Platform.OS === 'ios' ? 40 : 50),
+            paddingHorizontal: 20,
+            alignItems: 'center',
+            justifyContent: 'center',
+          },
+        ]}
+      >
+        <View style={[styles.guestCard, cardShadow(2)]}>
+          <View style={styles.guestIconCircle}>
+            <Ionicons name="ribbon-outline" size={48} color={Colors.emerald} />
+          </View>
+          <Text style={styles.guestTitle}>Earned Certificates</Text>
+          <Text style={styles.guestSubtitle}>
+            Sign in to view, verify, and download your accredited course certificates.
+          </Text>
+          <TouchableOpacity
+            style={styles.guestSignInBtn}
+            activeOpacity={0.85}
+            onPress={() => navigation?.navigate?.('Login')}
+          >
+            <Text style={styles.guestSignInBtnText}>Sign In</Text>
+            <Ionicons name="arrow-forward" size={16} color="#FFFFFF" />
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
+  }
 
   const renderCertItem = ({ item }: { item: CertificateItem }) => (
     <View style={[styles.certCard, cardShadow(2)]}>
@@ -257,6 +297,54 @@ const styles = StyleSheet.create({
   browseBtnText: {
     color: '#FFFFFF',
     fontSize: 13,
+    fontWeight: '700',
+  },
+  guestCard: {
+    width: '100%',
+    backgroundColor: Colors.surface,
+    borderRadius: 20,
+    padding: 28,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: Colors.borderSubtle,
+  },
+  guestIconCircle: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: 'rgba(236, 254, 255, 0.9)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 20,
+  },
+  guestTitle: {
+    fontSize: 20,
+    fontWeight: '800',
+    color: Colors.textMain,
+    marginBottom: 10,
+    textAlign: 'center',
+  },
+  guestSubtitle: {
+    fontSize: 14,
+    lineHeight: 22,
+    color: Colors.textSecondary,
+    textAlign: 'center',
+    marginBottom: 24,
+  },
+  guestSignInBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: Colors.signal,
+    paddingVertical: 14,
+    paddingHorizontal: 28,
+    borderRadius: 14,
+    width: '100%',
+    justifyContent: 'center',
+  },
+  guestSignInBtnText: {
+    color: '#FFFFFF',
+    fontSize: 15,
     fontWeight: '700',
   },
 });

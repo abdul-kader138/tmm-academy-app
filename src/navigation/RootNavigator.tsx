@@ -6,6 +6,7 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../theme/colors';
+import { useAuth } from '../context/AuthContext';
 
 // Screens
 import { WelcomeScreen } from '../screens/WelcomeScreen';
@@ -37,6 +38,7 @@ const navTheme = {
 
 function BottomTabs() {
   const insets = useSafeAreaInsets();
+  const { user } = useAuth();
   const bottomPadding = insets.bottom > 0 ? insets.bottom : (Platform.OS === 'android' ? 10 : 8);
   const tabHeight = 58 + bottomPadding;
 
@@ -74,6 +76,8 @@ function BottomTabs() {
             iconName = focused ? 'ribbon' : 'ribbon-outline';
           } else if (route.name === 'AccountTab') {
             iconName = focused ? 'person' : 'person-outline';
+          } else if (route.name === 'LoginTab') {
+            iconName = focused ? 'log-in' : 'log-in-outline';
           }
           return <Ionicons name={iconName} size={size} color={color} />;
         },
@@ -84,21 +88,37 @@ function BottomTabs() {
         component={CourseCatalogScreen}
         options={{ tabBarLabel: 'Courses' }}
       />
-      <Tab.Screen
-        name="DashboardTab"
-        component={DashboardScreen}
-        options={{ tabBarLabel: 'Dashboard' }}
-      />
-      <Tab.Screen
-        name="CertificatesTab"
-        component={CertificatesScreen}
-        options={{ tabBarLabel: 'Certificates' }}
-      />
-      <Tab.Screen
-        name="AccountTab"
-        component={AccountScreen}
-        options={{ tabBarLabel: 'Account' }}
-      />
+      {user ? (
+        <>
+          <Tab.Screen
+            name="DashboardTab"
+            component={DashboardScreen}
+            options={{ tabBarLabel: 'Dashboard' }}
+          />
+          <Tab.Screen
+            name="CertificatesTab"
+            component={CertificatesScreen}
+            options={{ tabBarLabel: 'Certificates' }}
+          />
+          <Tab.Screen
+            name="AccountTab"
+            component={AccountScreen}
+            options={{ tabBarLabel: 'Account' }}
+          />
+        </>
+      ) : (
+        <Tab.Screen
+          name="LoginTab"
+          component={LoginScreen}
+          options={{ tabBarLabel: 'Sign In' }}
+          listeners={({ navigation }) => ({
+            tabPress: (e) => {
+              e.preventDefault();
+              navigation.navigate('Login');
+            },
+          })}
+        />
+      )}
     </Tab.Navigator>
   );
 }
