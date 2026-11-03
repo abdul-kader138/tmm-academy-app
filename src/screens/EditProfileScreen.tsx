@@ -18,6 +18,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Colors, cardShadow } from '../theme/colors';
 import { useAuth } from '../context/AuthContext';
 import { lmsApi } from '../api/lmsApi';
+import { PhoneInputField, PhoneValue } from '../components/PhoneInputField';
 
 export const EditProfileScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   const insets = useSafeAreaInsets();
@@ -27,6 +28,7 @@ export const EditProfileScreen: React.FC<{ navigation: any }> = ({ navigation })
   const [lastName, setLastName] = useState(user?.last_name || '');
   const [email, setEmail] = useState(user?.email || '');
   const [phone, setPhone] = useState(user?.phone || '');
+  const [phoneValue, setPhoneValue] = useState<PhoneValue | null>(null);
   const [locale, setLocale] = useState<'en' | 'it' | 'bn'>((user?.locale as any) || 'en');
 
   const [saving, setSaving] = useState(false);
@@ -157,12 +159,30 @@ export const EditProfileScreen: React.FC<{ navigation: any }> = ({ navigation })
   };
 
   const handleSave = async () => {
-    if (!firstName.trim()) {
-      Alert.alert('Required Field', 'First name cannot be empty.');
+    // TMS-Wise Form Validations
+    if (!firstName.trim() || firstName.trim().length < 2) {
+      Alert.alert('Invalid Name', 'First name must contain at least 2 letters.');
       return;
     }
-    if (!lastName.trim()) {
-      Alert.alert('Required Field', 'Last name cannot be empty.');
+    if (!lastName.trim() || lastName.trim().length < 2) {
+      Alert.alert('Invalid Name', 'Last name must contain at least 2 letters.');
+      return;
+    }
+
+    const namePattern = /^[\p{L}\s'-]+$/u;
+    if (!namePattern.test(firstName.trim()) || !namePattern.test(lastName.trim())) {
+      Alert.alert('Invalid Name', 'First and last names can only contain alphabetic letters.');
+      return;
+    }
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!email.trim() || !emailRegex.test(email.trim())) {
+      Alert.alert('Invalid Email', 'Please enter a valid email address (e.g. name@example.com).');
+      return;
+    }
+
+    if (phone.trim() && phoneValue && !phoneValue.isValid) {
+      Alert.alert('Invalid Phone', 'Please enter a valid phone number for the selected country code.');
       return;
     }
 
@@ -370,21 +390,17 @@ export const EditProfileScreen: React.FC<{ navigation: any }> = ({ navigation })
               </View>
             </View>
 
-            {/* Phone Number */}
-            <View style={styles.fieldGroup}>
-              <Text style={styles.inputLabel}>PHONE NUMBER</Text>
-              <View style={styles.inputContainer}>
-                <Ionicons name="call-outline" size={18} color={Colors.textMuted} style={styles.fieldIcon} />
-                <TextInput
-                  style={styles.input}
-                  value={phone}
-                  onChangeText={setPhone}
-                  placeholder="+39 123 456 7890"
-                  placeholderTextColor={Colors.textMuted}
-                  keyboardType="phone-pad"
-                />
-              </View>
-            </View>
+            {/* Phone Number with Country Code (TMS Style) */}
+            <PhoneInputField
+              value={phone}
+              onChangePhone={(p) => {
+                setPhone(p.fullNumber);
+                setPhoneValue(p);
+              }}
+              label="PHONE NUMBER"
+              placeholder="345 678 9012"
+              defaultCountry="IT"
+            />
           </View>
 
           {/* Form Card 2: Preferences */}

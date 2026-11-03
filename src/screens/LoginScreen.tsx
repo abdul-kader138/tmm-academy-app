@@ -19,6 +19,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors, cardShadow } from '../theme/colors';
 import { useAuth } from '../context/AuthContext';
 import { lmsApi } from '../api/lmsApi';
+import { PhoneInputField, PhoneValue } from '../components/PhoneInputField';
 
 type AuthMode = 'login' | 'register' | 'forgot_password';
 
@@ -35,6 +36,8 @@ export const LoginScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   const [passwordConfirmation, setPasswordConfirmation] = useState('');
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
+  const [phone, setPhone] = useState('');
+  const [phoneValue, setPhoneValue] = useState<PhoneValue | null>(null);
   const [remember, setRemember] = useState(true);
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -126,9 +129,11 @@ export const LoginScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
       const res = await register({
         first_name: firstName.trim(),
         last_name: lastName.trim(),
-        email: email.trim(),
+        email: email.trim().toLowerCase(),
         password: password.trim(),
         password_confirmation: passwordConfirmation.trim(),
+        phone: phone.trim() || null,
+        phone_country: phoneValue?.countryCode || null,
         cf_turnstile_response: turnstileToken,
       });
 
@@ -148,8 +153,9 @@ export const LoginScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
 
   // Handle Form Submit
   const handleSubmit = async () => {
-    if (!email.trim()) {
-      Alert.alert('Required Field', 'Please enter your email address.');
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!email.trim() || !emailRegex.test(email.trim())) {
+      Alert.alert('Invalid Email', 'Please enter a valid email address (e.g. name@example.com).');
       return;
     }
 
@@ -170,23 +176,43 @@ export const LoginScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
       return;
     }
 
-    if (!password.trim()) {
-      Alert.alert('Required Field', 'Please enter your password.');
-      return;
-    }
-
     if (mode === 'register') {
-      if (!firstName.trim() || !lastName.trim()) {
-        Alert.alert('Required Fields', 'Please enter your first and last name.');
+      if (!firstName.trim() || firstName.trim().length < 2) {
+        Alert.alert('Invalid Name', 'First name must contain at least 2 letters.');
         return;
       }
-      const namePattern = /^[\p{L}\s]+$/u;
+      if (!lastName.trim() || lastName.trim().length < 2) {
+        Alert.alert('Invalid Name', 'Last name must contain at least 2 letters.');
+        return;
+      }
+      const namePattern = /^[\p{L}\s'-]+$/u;
       if (!namePattern.test(firstName.trim()) || !namePattern.test(lastName.trim())) {
-        Alert.alert('Invalid Name', 'Names can only contain letters and spaces. Numbers and special characters are not allowed.');
+        Alert.alert('Invalid Name', 'First and last names can only contain alphabetic letters.');
+        return;
+      }
+      if (phone.trim() && phoneValue && !phoneValue.isValid) {
+        Alert.alert('Invalid Phone', 'Please enter a valid phone number for the selected country code.');
+        return;
+      }
+      if (!password) {
+        Alert.alert('Required Field', 'Please enter a password.');
+        return;
+      }
+      if (!passwordConfirmation) {
+        Alert.alert('Required Field', 'Please confirm your password.');
         return;
       }
       if (password !== passwordConfirmation) {
-        Alert.alert('Password Mismatch', 'Password confirmation does not match.');
+        Alert.alert('Password Mismatch', 'The passwords do not match. Please ensure both passwords are identical.');
+        return;
+      }
+      if (password.length < 8) {
+        Alert.alert('Password Requirement', 'Password must be at least 8 characters long.');
+        return;
+      }
+    } else {
+      if (!password.trim()) {
+        Alert.alert('Required Field', 'Please enter your password.');
         return;
       }
     }
@@ -343,6 +369,22 @@ export const LoginScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
               onChangeText={setEmail}
             />
           </View>
+
+          {/* Phone Number with Country Code (Register Mode) */}
+          {mode === 'register' && (
+            <View style={{ marginTop: 14 }}>
+              <PhoneInputField
+                value={phone}
+                onChangePhone={(p) => {
+                  setPhone(p.fullNumber);
+                  setPhoneValue(p);
+                }}
+                label="Phone Number (Optional)"
+                placeholder="345 678 9012"
+                defaultCountry="IT"
+              />
+            </View>
+          )}
 
           {/* Password (for login and register) */}
           {mode !== 'forgot_password' && (
