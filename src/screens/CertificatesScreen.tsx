@@ -10,6 +10,8 @@ import {
   Linking,
   Alert,
 } from 'react-native';
+import * as FileSystem from 'expo-file-system/legacy';
+import * as Sharing from 'expo-sharing';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
@@ -23,6 +25,7 @@ export const CertificatesScreen: React.FC<{ navigation?: any }> = ({ navigation 
   const { user } = useAuth();
   const [certificates, setCertificates] = useState<CertificateItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [downloadingId, setDownloadingId] = useState<number | null>(null);
 
   const fetchCertificates = useCallback(async (isSilent = false) => {
     if (!isSilent) setLoading(true);
@@ -47,16 +50,43 @@ export const CertificatesScreen: React.FC<{ navigation?: any }> = ({ navigation 
   );
 
   const handleDownload = async (cert: CertificateItem) => {
-    const downloadUrl = lmsApi.getCertificateDownloadUrl(cert.id);
+    const token = lmsApi.getToken();
+    if (!token) {
+      Alert.alert('Authentication Required', 'Please sign in to download your certificate.');
+      return;
+    }
+
+    setDownloadingId(cert.id);
     try {
-      const supported = await Linking.canOpenURL(downloadUrl);
-      if (supported) {
-        await Linking.openURL(downloadUrl);
+      const filename = `${cert.certificate_number || `Certificate_${cert.id}`}.pdf`;
+      const targetUri = `${FileSystem.documentDirectory}${filename}`;
+      const downloadUrl = lmsApi.getCertificateDownloadUrl(cert.id);
+
+      const downloadResult = await FileSystem.downloadAsync(downloadUrl, targetUri, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          Accept: 'application/pdf',
+        },
+      });
+
+      if (downloadResult.status === 200) {
+        const canShare = await Sharing.isAvailableAsync();
+        if (canShare) {
+          await Sharing.shareAsync(downloadResult.uri, {
+            mimeType: 'application/pdf',
+            dialogTitle: `Download ${cert.course_title} Certificate`,
+            UTI: 'com.adobe.pdf',
+          });
+        } else {
+          Alert.alert('Downloaded', `Certificate saved to: ${downloadResult.uri}`);
+        }
       } else {
-        Alert.alert('Download Link', downloadUrl);
+        Alert.alert('Download Failed', `Server returned status ${downloadResult.status}`);
       }
-    } catch {
-      Alert.alert('Download Error', 'Could not open certificate download link.');
+    } catch (err: any) {
+      Alert.alert('Download Error', err.message || 'Could not download certificate PDF.');
+    } finally {
+      setDownloadingId(null);
     }
   };
 
@@ -125,10 +155,17 @@ export const CertificatesScreen: React.FC<{ navigation?: any }> = ({ navigation 
         <TouchableOpacity
           style={styles.downloadBtn}
           onPress={() => handleDownload(item)}
+          disabled={downloadingId === item.id}
           activeOpacity={0.8}
         >
-          <Ionicons name="download-outline" size={15} color="#FFFFFF" />
-          <Text style={styles.downloadText}>PDF</Text>
+          {downloadingId === item.id ? (
+            <ActivityIndicator size="small" color="#FFFFFF" />
+          ) : (
+            <>
+              <Ionicons name="download-outline" size={15} color="#FFFFFF" />
+              <Text style={styles.downloadText}>PDF</Text>
+            </>
+          )}
         </TouchableOpacity>
 
         {item.verify_url ? (
