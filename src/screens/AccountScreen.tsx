@@ -11,9 +11,11 @@ import {
   TextInput,
   ActivityIndicator,
   KeyboardAvoidingView,
+  Image,
 } from 'react-native';
 import { WebView } from 'react-native-webview';
 import * as Clipboard from 'expo-clipboard';
+import * as ImagePicker from 'expo-image-picker';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors, cardShadow } from '../theme/colors';
@@ -33,6 +35,7 @@ export const AccountScreen: React.FC<{ navigation: any }> = ({ navigation }) => 
     confirm2FA,
     disable2FA,
     regenerateRecoveryCodes,
+    refreshUser,
   } = useAuth();
 
   // Modals state
@@ -63,10 +66,102 @@ export const AccountScreen: React.FC<{ navigation: any }> = ({ navigation }) => 
   const [deletePassword, setDeletePassword] = useState('');
 
   const [loading, setLoading] = useState(false);
+  const [avatarUploading, setAvatarUploading] = useState(false);
+  const [avatarLoadFailed, setAvatarLoadFailed] = useState(false);
 
   // Sanitize names: block all numbers and special characters
   const handleNameChange = (text: string, setter: (val: string) => void) => {
     setter(text.replace(/[^\p{L}\s]/gu, ''));
+  };
+
+  // Avatar Selection
+  const handleAvatarPress = () => {
+    Alert.alert('Profile Photo', 'Choose an option to update your photo:', [
+      {
+        text: 'Choose from Gallery',
+        onPress: async () => {
+          try {
+            const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+            if (status !== 'granted') {
+              Alert.alert('Permission Denied', 'Please grant photo library access.');
+              return;
+            }
+            const result = await ImagePicker.launchImageLibraryAsync({
+              mediaTypes: ImagePicker.MediaTypeOptions.Images,
+              allowsEditing: true,
+              aspect: [1, 1],
+              quality: 0.85,
+            });
+            if (!result.canceled && result.assets[0]?.uri) {
+              await uploadAvatarFile(result.assets[0].uri);
+            }
+          } catch (err: any) {
+            Alert.alert('Error', err?.message || 'Could not access gallery.');
+          }
+        },
+      },
+      {
+        text: 'Take Photo',
+        onPress: async () => {
+          try {
+            const { status } = await ImagePicker.requestCameraPermissionsAsync();
+            if (status !== 'granted') {
+              Alert.alert('Permission Denied', 'Please grant camera access.');
+              return;
+            }
+            const result = await ImagePicker.launchCameraAsync({
+              allowsEditing: true,
+              aspect: [1, 1],
+              quality: 0.85,
+            });
+            if (!result.canceled && result.assets[0]?.uri) {
+              await uploadAvatarFile(result.assets[0].uri);
+            }
+          } catch (err: any) {
+            Alert.alert('Error', err?.message || 'Could not access camera.');
+          }
+        },
+      },
+      ...(user?.avatar_url
+        ? [
+            {
+              text: 'Remove Photo',
+              style: 'destructive' as const,
+              onPress: async () => {
+                setAvatarUploading(true);
+                try {
+                  const res = await lmsApi.removeAvatar();
+                  if (res.success) {
+                    await refreshUser();
+                    Alert.alert('Success', 'Profile photo removed.');
+                  } else {
+                    Alert.alert('Error', res.error || 'Could not remove photo.');
+                  }
+                } finally {
+                  setAvatarUploading(false);
+                }
+              },
+            },
+          ]
+        : []),
+      { text: 'Cancel', style: 'cancel' },
+    ]);
+  };
+
+  const uploadAvatarFile = async (uri: string) => {
+    setAvatarUploading(true);
+    try {
+      const res = await lmsApi.uploadAvatar(uri);
+      if (res.success) {
+        await refreshUser();
+        setAvatarLoadFailed(false);
+        Alert.alert('Success', 'Profile photo updated successfully.');
+      } else {
+        Alert.alert('Upload Failed', res.error || 'Could not upload photo.');
+      }
+    } finally {
+      setAvatarUploading(false);
+    }
   };
 
   // Resend Email Verification
@@ -271,7 +366,6 @@ export const AccountScreen: React.FC<{ navigation: any }> = ({ navigation }) => 
     }
   };
 
-  // Copy text helper
   const copyToClipboard = async (text: string, label: string) => {
     await Clipboard.setStringAsync(text);
     Alert.alert('Copied', `${label} copied to clipboard.`);
@@ -291,227 +385,297 @@ export const AccountScreen: React.FC<{ navigation: any }> = ({ navigation }) => 
     ]);
   };
 
-  return (
-    <View style={styles.container}>
-      {/* Header */}
-      <View
-        style={[
-          styles.header,
-          {
-            paddingTop: insets.top + (Platform.OS === 'ios' ? 8 : 16),
-          },
-        ]}
-      >
-        <Text style={styles.screenTitle}>Account & Settings</Text>
-      </View>
+  const initialLetter = user?.first_name ? user.first_name[0].toUpperCase() : 'L';
 
-      <ScrollView
-        contentContainerStyle={[
-          styles.content,
-          { paddingBottom: insets.bottom + 80 },
-        ]}
-        showsVerticalScrollIndicator={false}
-      >
-        {/* User Card */}
-        <View style={[styles.userCard, cardShadow(2)]}>
-          <View style={styles.avatarCircle}>
-            <Ionicons name="person" size={28} color={Colors.signal} />
+  return (
+    <ScrollView
+      style={styles.container}
+      contentContainerStyle={[
+        styles.content,
+        { paddingTop: insets.top + (Platform.OS === 'ios' ? 12 : 20) },
+      ]}
+      showsVerticalScrollIndicator={false}
+    >
+      {/* ================================================= */}
+      {/* 1. TMS-STYLE IDENTITY HEADER CARD */}
+      {/* ================================================= */}
+      <View style={[styles.profileHeaderCard, cardShadow(2)]}>
+        <TouchableOpacity
+          style={styles.avatarWrapper}
+          onPress={handleAvatarPress}
+          activeOpacity={0.8}
+          disabled={avatarUploading}
+        >
+          <View style={styles.avatarMini}>
+            {user?.avatar_url && !avatarLoadFailed ? (
+              <Image
+                source={{ uri: user.avatar_url }}
+                style={styles.avatarImage}
+                onError={() => setAvatarLoadFailed(true)}
+              />
+            ) : (
+              <Text style={styles.avatarMiniText}>{initialLetter}</Text>
+            )}
+            {avatarUploading && (
+              <View style={styles.avatarLoadingOverlay}>
+                <ActivityIndicator size="small" color="#FFFFFF" />
+              </View>
+            )}
           </View>
-          <View style={styles.userInfo}>
-            <Text style={styles.userName}>
+          <View style={styles.cameraBadge}>
+            <Ionicons name="camera" size={11} color="#FFFFFF" />
+          </View>
+        </TouchableOpacity>
+
+        <View style={styles.profileHeaderInfo}>
+          <View style={styles.profileNameRow}>
+            <Text style={styles.profileName} numberOfLines={1}>
               {user ? `${user.first_name} ${user.last_name}` : 'Learner Account'}
             </Text>
-            {user?.email ? (
-              <Text style={styles.userEmail}>{user.email}</Text>
-            ) : null}
-
-            <View style={styles.badgeRow}>
-              {user?.email_verified ? (
-                <View style={styles.verifiedBadge}>
-                  <Ionicons name="shield-checkmark" size={12} color={Colors.emerald} />
-                  <Text style={styles.verifiedText}>Verified</Text>
-                </View>
-              ) : (
-                <TouchableOpacity
-                  style={styles.unverifiedBadge}
-                  onPress={handleResendEmail}
-                  activeOpacity={0.7}
-                >
-                  <Ionicons name="alert-circle" size={12} color={Colors.amber} />
-                  <Text style={styles.unverifiedText}>Verify Email (Resend)</Text>
-                </TouchableOpacity>
-              )}
-
-              <TouchableOpacity
-                style={styles.editProfileBtn}
-                onPress={() => {
-                  setFirstName(user?.first_name || '');
-                  setLastName(user?.last_name || '');
-                  setPhone(user?.phone || '');
-                  setLocale((user?.locale as any) || 'en');
-                  setEditProfileVisible(true);
-                }}
-                activeOpacity={0.7}
-              >
-                <Ionicons name="pencil-outline" size={12} color={Colors.signal} />
-                <Text style={styles.editProfileText}>Edit Profile</Text>
-              </TouchableOpacity>
+            <View style={styles.tierPill}>
+              <Ionicons name="school" size={10} color={Colors.signal} />
+              <Text style={styles.tierText}>LEARNER</Text>
             </View>
           </View>
-        </View>
 
-        {/* Security & Authentication Section */}
-        <Text style={styles.groupHeading}>Security & Access</Text>
-        <View style={[styles.settingsGroup, cardShadow(1)]}>
-          {/* Two-Factor Authentication */}
-          <TouchableOpacity
-            style={styles.settingRow}
-            activeOpacity={0.7}
-            onPress={() => {
-              if (user?.two_factor_enabled) {
-                setTwoFactorPassword('');
-                setTwoFactorManageVisible(true);
-              } else {
-                handleStart2FASetup();
-              }
-            }}
-          >
-            <View style={styles.settingIcon}>
+          <Text style={styles.profileEmail} numberOfLines={1}>
+            {user?.email || 'learner@tmminnovation.com'}
+          </Text>
+
+          <View style={styles.profileStatusRow}>
+            <View style={[styles.statusDot, user?.email_verified ? styles.dotGreen : styles.dotAmber]} />
+            <Text style={styles.profileStatusText}>
+              {user?.email_verified ? 'Verified Account' : 'Pending Email Verification'}
+            </Text>
+          </View>
+
+          <View style={styles.actionLinksRow}>
+            <TouchableOpacity
+              onPress={handleAvatarPress}
+              style={styles.editPhotoBtn}
+              activeOpacity={0.7}
+              disabled={avatarUploading}
+            >
+              <Ionicons name="camera-outline" size={12} color={Colors.signal} />
+              <Text style={styles.editPhotoBtnText}>
+                {avatarUploading ? 'Uploading…' : user?.avatar_url ? 'Change photo' : 'Add photo'}
+              </Text>
+            </TouchableOpacity>
+
+            {!user?.email_verified && (
+              <TouchableOpacity
+                onPress={handleResendEmail}
+                style={[styles.editPhotoBtn, { marginLeft: 12 }]}
+                activeOpacity={0.7}
+              >
+                <Ionicons name="mail-unread-outline" size={12} color={Colors.amber} />
+                <Text style={[styles.editPhotoBtnText, { color: Colors.amber }]}>Resend link</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        </View>
+      </View>
+
+      {/* ================================================= */}
+      {/* 2. TMS-STYLE MENU GROUP 1: ACCOUNT & CREDENTIALS */}
+      {/* ================================================= */}
+      <Text style={styles.groupHeading}>Account & Security</Text>
+      <View style={[styles.menuGroup, cardShadow(2)]}>
+        {/* Personal Information Row */}
+        <TouchableOpacity
+          style={styles.menuRow}
+          activeOpacity={0.7}
+          onPress={() => {
+            setFirstName(user?.first_name || '');
+            setLastName(user?.last_name || '');
+            setPhone(user?.phone || '');
+            setLocale((user?.locale as any) || 'en');
+            setEditProfileVisible(true);
+          }}
+        >
+          <View style={styles.menuRowLeft}>
+            <View style={styles.menuIconCircle}>
+              <Ionicons name="person-outline" size={18} color={Colors.signal} />
+            </View>
+            <View style={styles.menuTextCol}>
+              <Text style={styles.menuTitle}>Personal Information</Text>
+              <Text style={styles.menuSub}>Update name, phone number, and preferences</Text>
+            </View>
+          </View>
+          <Ionicons name="chevron-forward" size={16} color={Colors.textMuted} />
+        </TouchableOpacity>
+
+        {/* Security & 2FA Row with TMS status badge */}
+        <TouchableOpacity
+          style={styles.menuRow}
+          activeOpacity={0.7}
+          onPress={() => {
+            if (user?.two_factor_enabled) {
+              setTwoFactorPassword('');
+              setTwoFactorManageVisible(true);
+            } else {
+              handleStart2FASetup();
+            }
+          }}
+        >
+          <View style={styles.menuRowLeft}>
+            <View
+              style={[
+                styles.menuIconCircle,
+                user?.two_factor_enabled ? { backgroundColor: '#ECFDF5' } : null,
+              ]}
+            >
               <Ionicons
-                name="shield-checkmark-outline"
-                size={20}
+                name={user?.two_factor_enabled ? 'shield-checkmark' : 'shield-outline'}
+                size={18}
                 color={user?.two_factor_enabled ? Colors.emerald : Colors.signal}
               />
             </View>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.settingTitle}>Two-Factor Authentication (2FA)</Text>
-              <Text style={styles.settingSubtitle}>
-                {user?.two_factor_enabled
-                  ? 'Authenticator app is active'
-                  : 'Add extra layer of login security'}
-              </Text>
+            <View style={styles.menuTextCol}>
+              <View style={styles.menuTitleRow}>
+                <Text style={styles.menuTitle}>Security & 2FA</Text>
+                <View
+                  style={[
+                    styles.statusBadge,
+                    user?.two_factor_enabled ? styles.statusBadgeActive : styles.statusBadgeInactive,
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.statusBadgeText,
+                      user?.two_factor_enabled ? styles.statusBadgeTextActive : styles.statusBadgeTextInactive,
+                    ]}
+                  >
+                    {user?.two_factor_enabled ? 'ENABLED' : 'OFF'}
+                  </Text>
+                </View>
+              </View>
+              <Text style={styles.menuSub}>Google Authenticator (TOTP) & recovery keys</Text>
             </View>
-            <View
-              style={[
-                styles.statusPill,
-                { backgroundColor: user?.two_factor_enabled ? '#ECFDF5' : Colors.surfaceElevated },
-              ]}
-            >
-              <Text
-                style={[
-                  styles.statusPillText,
-                  { color: user?.two_factor_enabled ? Colors.emerald : Colors.textMuted },
-                ]}
-              >
-                {user?.two_factor_enabled ? 'Active' : 'Disabled'}
-              </Text>
-            </View>
-            <Ionicons name="chevron-forward" size={18} color={Colors.textMuted} />
-          </TouchableOpacity>
+          </View>
+          <Ionicons name="chevron-forward" size={16} color={Colors.textMuted} />
+        </TouchableOpacity>
 
-          <View style={styles.divider} />
-
-          {/* Change Password */}
-          <TouchableOpacity
-            style={styles.settingRow}
-            activeOpacity={0.7}
-            onPress={() => {
-              setCurrentPassword('');
-              setNewPassword('');
-              setConfirmNewPassword('');
-              setChangePasswordVisible(true);
-            }}
-          >
-            <View style={styles.settingIcon}>
-              <Ionicons name="lock-closed-outline" size={20} color={Colors.signal} />
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.settingTitle}>Change Password</Text>
-              <Text style={styles.settingSubtitle}>Update your current credentials</Text>
-            </View>
-            <Ionicons name="chevron-forward" size={18} color={Colors.textMuted} />
-          </TouchableOpacity>
-        </View>
-
-        {/* Preferences & Privacy */}
-        <Text style={styles.groupHeading}>Preferences & Compliance</Text>
-        <View style={[styles.settingsGroup, cardShadow(1)]}>
-          <TouchableOpacity
-            style={styles.settingRow}
-            activeOpacity={0.7}
-            onPress={() => {
-              setFirstName(user?.first_name || '');
-              setLastName(user?.last_name || '');
-              setPhone(user?.phone || '');
-              setLocale((user?.locale as any) || 'en');
-              setEditProfileVisible(true);
-            }}
-          >
-            <View style={styles.settingIcon}>
-              <Ionicons name="globe-outline" size={20} color={Colors.signal} />
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.settingTitle}>Preferred Language</Text>
-              <Text style={styles.settingSubtitle}>Interface and communications</Text>
-            </View>
-            <Text style={styles.settingValue}>
-              {user?.locale === 'bn' ? 'বাংলা (BN)' : user?.locale === 'it' ? 'Italiano (IT)' : 'English (EN)'}
-            </Text>
-            <Ionicons name="chevron-forward" size={18} color={Colors.textMuted} />
-          </TouchableOpacity>
-
-          <View style={styles.divider} />
-
-          {/* GDPR Export */}
-          <TouchableOpacity
-            style={styles.settingRow}
-            activeOpacity={0.7}
-            onPress={handleExportData}
-            disabled={loading}
-          >
-            <View style={styles.settingIcon}>
-              <Ionicons name="download-outline" size={20} color={Colors.signal} />
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.settingTitle}>Export Account Data (GDPR)</Text>
-              <Text style={styles.settingSubtitle}>Download all your LMS history</Text>
-            </View>
-            <Ionicons name="chevron-forward" size={18} color={Colors.textMuted} />
-          </TouchableOpacity>
-        </View>
-
-        {/* Danger Zone: Delete & Logout */}
-        <Text style={styles.groupHeading}>Danger Zone</Text>
-        <View style={[styles.settingsGroup, cardShadow(1)]}>
-          <TouchableOpacity
-            style={styles.settingRow}
-            activeOpacity={0.7}
-            onPress={() => {
-              setDeletePassword('');
-              setDeleteAccountVisible(true);
-            }}
-          >
-            <View style={styles.settingIcon}>
-              <Ionicons name="trash-outline" size={20} color={Colors.rose} />
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={[styles.settingTitle, { color: Colors.rose }]}>Delete Account</Text>
-              <Text style={styles.settingSubtitle}>Permanently anonymize learner data</Text>
-            </View>
-            <Ionicons name="chevron-forward" size={18} color={Colors.textMuted} />
-          </TouchableOpacity>
-        </View>
-
-        {/* Logout Button */}
+        {/* Change Password Row */}
         <TouchableOpacity
-          style={[styles.logoutBtn, cardShadow(2)]}
-          activeOpacity={0.8}
+          style={[styles.menuRow, { borderBottomWidth: 0 }]}
+          activeOpacity={0.7}
+          onPress={() => {
+            setCurrentPassword('');
+            setNewPassword('');
+            setConfirmNewPassword('');
+            setChangePasswordVisible(true);
+          }}
+        >
+          <View style={styles.menuRowLeft}>
+            <View style={styles.menuIconCircle}>
+              <Ionicons name="lock-closed-outline" size={18} color={Colors.signal} />
+            </View>
+            <View style={styles.menuTextCol}>
+              <Text style={styles.menuTitle}>Change Password</Text>
+              <Text style={styles.menuSub}>Update your account login password</Text>
+            </View>
+          </View>
+          <Ionicons name="chevron-forward" size={16} color={Colors.textMuted} />
+        </TouchableOpacity>
+      </View>
+
+      {/* ================================================= */}
+      {/* 3. TMS-STYLE MENU GROUP 2: PREFERENCES & COMPLIANCE */}
+      {/* ================================================= */}
+      <Text style={styles.groupHeading}>Preferences & Compliance</Text>
+      <View style={[styles.menuGroup, cardShadow(2)]}>
+        {/* App Language */}
+        <TouchableOpacity
+          style={styles.menuRow}
+          activeOpacity={0.7}
+          onPress={() => {
+            setFirstName(user?.first_name || '');
+            setLastName(user?.last_name || '');
+            setPhone(user?.phone || '');
+            setLocale((user?.locale as any) || 'en');
+            setEditProfileVisible(true);
+          }}
+        >
+          <View style={styles.menuRowLeft}>
+            <View style={styles.menuIconCircle}>
+              <Ionicons name="globe-outline" size={18} color={Colors.signal} />
+            </View>
+            <View style={styles.menuTextCol}>
+              <Text style={styles.menuTitle}>Default Language</Text>
+              <Text style={styles.menuSub}>
+                {user?.locale === 'bn' ? 'বাংলা (BN)' : user?.locale === 'it' ? 'Italiano (IT)' : 'English (EN)'}
+              </Text>
+            </View>
+          </View>
+          <Ionicons name="chevron-forward" size={16} color={Colors.textMuted} />
+        </TouchableOpacity>
+
+        {/* GDPR Export */}
+        <TouchableOpacity
+          style={[styles.menuRow, { borderBottomWidth: 0 }]}
+          activeOpacity={0.7}
+          onPress={handleExportData}
+          disabled={loading}
+        >
+          <View style={styles.menuRowLeft}>
+            <View style={styles.menuIconCircle}>
+              <Ionicons name="download-outline" size={18} color={Colors.signal} />
+            </View>
+            <View style={styles.menuTextCol}>
+              <Text style={styles.menuTitle}>Export Account Data (GDPR)</Text>
+              <Text style={styles.menuSub}>Download archive of learning and certificates</Text>
+            </View>
+          </View>
+          <Ionicons name="chevron-forward" size={16} color={Colors.textMuted} />
+        </TouchableOpacity>
+      </View>
+
+      {/* ================================================= */}
+      {/* 4. TMS-STYLE MENU GROUP 3: DANGER ZONE & SESSION */}
+      {/* ================================================= */}
+      <Text style={styles.groupHeading}>Danger Zone</Text>
+      <View style={[styles.menuGroup, cardShadow(2)]}>
+        {/* Delete Account */}
+        <TouchableOpacity
+          style={styles.menuRow}
+          activeOpacity={0.7}
+          onPress={() => {
+            setDeletePassword('');
+            setDeleteAccountVisible(true);
+          }}
+        >
+          <View style={styles.menuRowLeft}>
+            <View style={[styles.menuIconCircle, { backgroundColor: '#FFF1F2' }]}>
+              <Ionicons name="trash-outline" size={18} color={Colors.rose} />
+            </View>
+            <View style={styles.menuTextCol}>
+              <Text style={[styles.menuTitle, { color: Colors.rose }]}>Delete Account</Text>
+              <Text style={styles.menuSub}>Permanently anonymize learner data per GDPR</Text>
+            </View>
+          </View>
+          <Ionicons name="chevron-forward" size={16} color={Colors.textMuted} />
+        </TouchableOpacity>
+
+        {/* Sign Out */}
+        <TouchableOpacity
+          style={[styles.menuRow, { borderBottomWidth: 0 }]}
+          activeOpacity={0.7}
           onPress={handleLogout}
         >
-          <Ionicons name="log-out-outline" size={18} color="#FFFFFF" />
-          <Text style={styles.logoutText}>Sign Out from TMM Academy</Text>
+          <View style={styles.menuRowLeft}>
+            <View style={[styles.menuIconCircle, { backgroundColor: '#FFF1F2' }]}>
+              <Ionicons name="log-out-outline" size={18} color={Colors.rose} />
+            </View>
+            <View style={styles.menuTextCol}>
+              <Text style={[styles.menuTitle, { color: Colors.rose }]}>Sign Out</Text>
+              <Text style={styles.menuSub}>Terminate current Sanctum session</Text>
+            </View>
+          </View>
         </TouchableOpacity>
-      </ScrollView>
+      </View>
+
+      <View style={{ height: 40 }} />
 
       {/* ================================================= */}
       {/* MODAL 1: EDIT PROFILE */}
@@ -523,7 +687,7 @@ export const AccountScreen: React.FC<{ navigation: any }> = ({ navigation }) => 
         >
           <View style={[styles.modalCard, cardShadow(3)]}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Edit Profile</Text>
+              <Text style={styles.modalTitle}>Personal Information</Text>
               <TouchableOpacity onPress={() => setEditProfileVisible(false)}>
                 <Ionicons name="close" size={22} color={Colors.textMain} />
               </TouchableOpacity>
@@ -553,7 +717,7 @@ export const AccountScreen: React.FC<{ navigation: any }> = ({ navigation }) => 
                 </View>
               </View>
 
-              <Text style={styles.inputLabel}>Phone (Optional)</Text>
+              <Text style={styles.inputLabel}>Phone Number</Text>
               <TextInput
                 style={styles.inputField}
                 value={phone}
@@ -563,7 +727,7 @@ export const AccountScreen: React.FC<{ navigation: any }> = ({ navigation }) => 
                 keyboardType="phone-pad"
               />
 
-              <Text style={styles.inputLabel}>Preferred Language</Text>
+              <Text style={styles.inputLabel}>Default Language</Text>
               <View style={styles.languageRow}>
                 {[
                   { code: 'en', label: 'English' },
@@ -598,7 +762,7 @@ export const AccountScreen: React.FC<{ navigation: any }> = ({ navigation }) => 
                 {loading ? (
                   <ActivityIndicator color="#FFFFFF" />
                 ) : (
-                  <Text style={styles.modalPrimaryBtnText}>Save Profile</Text>
+                  <Text style={styles.modalPrimaryBtnText}>Save Changes</Text>
                 )}
               </TouchableOpacity>
             </ScrollView>
@@ -901,7 +1065,7 @@ export const AccountScreen: React.FC<{ navigation: any }> = ({ navigation }) => 
           </View>
         </KeyboardAvoidingView>
       </Modal>
-    </View>
+    </ScrollView>
   );
 };
 
@@ -910,176 +1074,230 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: Colors.canvas,
   },
-  header: {
-    paddingHorizontal: 20,
-    paddingBottom: 14,
-    backgroundColor: Colors.surface,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.borderSubtle,
-  },
-  screenTitle: {
-    color: Colors.textMain,
-    fontSize: 22,
-    fontWeight: '800',
-    letterSpacing: -0.3,
-  },
   content: {
     padding: 16,
-    gap: 16,
+    paddingBottom: 60,
   },
-  userCard: {
+
+  /* TMS-style Profile Header Card */
+  profileHeaderCard: {
+    backgroundColor: Colors.surface,
+    borderRadius: 18,
+    padding: 16,
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: Colors.surface,
-    borderRadius: 16,
-    padding: 18,
+    marginBottom: 16,
     borderWidth: 1,
     borderColor: Colors.borderSubtle,
+    gap: 14,
   },
-  avatarCircle: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
-    backgroundColor: '#ECFEFF',
-    borderWidth: 1,
-    borderColor: '#A5F3FC',
+  avatarWrapper: {
+    position: 'relative',
+  },
+  avatarMini: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: Colors.signal,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 14,
+    borderWidth: 2,
+    borderColor: '#ECFEFF',
+    overflow: 'hidden',
   },
-  userInfo: {
-    flex: 1,
-  },
-  userName: {
-    color: Colors.textMain,
-    fontSize: 17,
+  avatarMiniText: {
+    fontSize: 24,
     fontWeight: '800',
+    color: '#FFFFFF',
   },
-  userEmail: {
-    color: Colors.textSecondary,
-    fontSize: 13,
-    marginTop: 2,
-    marginBottom: 6,
+  avatarImage: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
   },
-  badgeRow: {
+  cameraBadge: {
+    position: 'absolute',
+    bottom: -2,
+    right: -2,
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: Colors.signal,
+    borderWidth: 1.5,
+    borderColor: Colors.surface,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  avatarLoadingOverlay: {
+    ...StyleSheet.absoluteFill,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderRadius: 28,
+  },
+  profileHeaderInfo: {
+    flex: 1,
+    justifyContent: 'center',
+  },
+  profileNameRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
     gap: 8,
   },
-  verifiedBadge: {
+  profileName: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: Colors.textMain,
+    flexShrink: 1,
+  },
+  tierPill: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#ECFDF5',
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 6,
     gap: 4,
-  },
-  verifiedText: {
-    color: Colors.emerald,
-    fontSize: 11,
-    fontWeight: '700',
-  },
-  unverifiedBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#FFFBEB',
+    backgroundColor: '#ECFEFF',
     paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 6,
-    gap: 4,
+    paddingVertical: 2,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#A5F3FC',
   },
-  unverifiedText: {
-    color: Colors.amber,
-    fontSize: 11,
-    fontWeight: '700',
-  },
-  editProfileBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: Colors.surfaceElevated,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 6,
-    gap: 4,
-  },
-  editProfileText: {
+  tierText: {
+    fontSize: 10,
+    fontWeight: '800',
     color: Colors.signal,
+  },
+  profileEmail: {
+    fontSize: 12,
+    color: Colors.textSecondary,
+    marginTop: 2,
+  },
+  profileStatusRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 4,
+  },
+  statusDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+  },
+  dotGreen: {
+    backgroundColor: Colors.emerald,
+  },
+  dotAmber: {
+    backgroundColor: Colors.amber,
+  },
+  profileStatusText: {
+    fontSize: 11,
+    color: Colors.textSecondary,
+    fontWeight: '600',
+  },
+  actionLinksRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 6,
+  },
+  editPhotoBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    gap: 4,
+  },
+  editPhotoBtnText: {
     fontSize: 11,
     fontWeight: '700',
+    color: Colors.signal,
   },
+
+  /* TMS-style Menu Groups */
   groupHeading: {
     color: Colors.textSecondary,
     fontSize: 12,
-    fontWeight: '700',
+    fontWeight: '800',
     textTransform: 'uppercase',
     letterSpacing: 0.5,
-    marginTop: 6,
+    marginTop: 10,
+    marginBottom: 8,
     marginLeft: 4,
   },
-  settingsGroup: {
+  menuGroup: {
     backgroundColor: Colors.surface,
-    borderRadius: 14,
+    borderRadius: 18,
     borderWidth: 1,
     borderColor: Colors.borderSubtle,
     overflow: 'hidden',
+    marginBottom: 10,
   },
-  settingRow: {
+  menuRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 14,
+    justifyContent: 'space-between',
+    padding: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.borderSubtle,
+    minHeight: 62,
   },
-  settingIcon: {
-    width: 28,
-    alignItems: 'center',
-    marginRight: 12,
-  },
-  settingTitle: {
-    color: Colors.textMain,
-    fontSize: 14,
-    fontWeight: '700',
-  },
-  settingSubtitle: {
-    color: Colors.textSecondary,
-    fontSize: 12,
-    marginTop: 2,
-  },
-  settingValue: {
-    color: Colors.textSecondary,
-    fontSize: 13,
-    fontWeight: '600',
-    marginRight: 6,
-  },
-  statusPill: {
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 6,
-    marginRight: 6,
-  },
-  statusPillText: {
-    fontSize: 12,
-    fontWeight: '700',
-  },
-  divider: {
-    height: 1,
-    backgroundColor: Colors.borderSubtle,
-    marginLeft: 56,
-  },
-  logoutBtn: {
+  menuRowLeft: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: Colors.signal,
+    gap: 12,
+    flex: 1,
+    marginRight: 10,
+  },
+  menuIconCircle: {
+    width: 38,
+    height: 38,
     borderRadius: 12,
-    paddingVertical: 13,
-    gap: 8,
-    marginTop: 10,
+    backgroundColor: Colors.surfaceElevated,
+    justifyContent: 'center',
+    alignItems: 'center',
+    flexShrink: 0,
   },
-  logoutText: {
-    color: '#FFFFFF',
+  menuTextCol: {
+    flex: 1,
+    justifyContent: 'center',
+  },
+  menuTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: 6,
+    marginBottom: 2,
+  },
+  menuTitle: {
     fontSize: 14,
     fontWeight: '700',
+    color: Colors.textMain,
+    flexShrink: 1,
+  },
+  menuSub: {
+    fontSize: 11,
+    color: Colors.textSecondary,
+    marginTop: 1,
+    lineHeight: 16,
+  },
+  statusBadge: {
+    paddingHorizontal: 7,
+    paddingVertical: 1,
+    borderRadius: 6,
+  },
+  statusBadgeActive: {
+    backgroundColor: '#ECFDF5',
+  },
+  statusBadgeInactive: {
+    backgroundColor: Colors.surfaceElevated,
+  },
+  statusBadgeText: {
+    fontSize: 10,
+    fontWeight: '800',
+  },
+  statusBadgeTextActive: {
+    color: Colors.emerald,
+  },
+  statusBadgeTextInactive: {
+    color: Colors.textMuted,
   },
 
   /* Modals */
@@ -1090,8 +1308,8 @@ const styles = StyleSheet.create({
   },
   modalCard: {
     backgroundColor: Colors.surface,
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
     padding: 20,
     maxHeight: '90%',
   },

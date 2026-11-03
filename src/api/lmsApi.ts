@@ -454,6 +454,67 @@ class LmsApiClient {
     });
   }
 
+  async uploadAvatar(imageUri: string): Promise<{ success: boolean; data?: Customer; error?: string }> {
+    await this.ensureCsrf();
+    const formData = new FormData();
+    const filename = imageUri.split('/').pop() || 'avatar.jpg';
+    const match = /\.(\w+)$/.exec(filename);
+    const type = match ? `image/${match[1]}` : 'image/jpeg';
+
+    formData.append('avatar', {
+      uri: imageUri,
+      name: filename,
+      type,
+    } as any);
+
+    const headers: Record<string, string> = {
+      Accept: 'application/json',
+      Referer: `${API_BASE_URL}/`,
+      Origin: API_BASE_URL,
+    };
+
+    if (this.token) {
+      headers.Authorization = `Bearer ${this.token}`;
+    }
+
+    const cookieHeader = this.getCookieHeader();
+    if (cookieHeader) {
+      headers.Cookie = cookieHeader;
+    }
+
+    if (this.xsrfToken) {
+      headers['X-XSRF-TOKEN'] = this.xsrfToken;
+    }
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/v1/account/avatar`, {
+        method: 'POST',
+        headers,
+        body: formData,
+      });
+
+      this.parseAndStoreCookies(response);
+      const json = await response.json();
+      if (!response.ok) {
+        return { success: false, error: json.message || 'Avatar upload failed' };
+      }
+      return { success: true, data: json };
+    } catch (err: any) {
+      return { success: false, error: err.message || 'Connection failed' };
+    }
+  }
+
+  async removeAvatar(): Promise<{ success: boolean; error?: string }> {
+    await this.ensureCsrf();
+    const res = await this.request<{ message: string }>('/api/v1/account/avatar', {
+      method: 'DELETE',
+    });
+    if (res.error) {
+      return { success: false, error: res.error };
+    }
+    return { success: true };
+  }
+
   async changePassword(payload: ChangePasswordPayload) {
     await this.ensureCsrf();
     return this.request<{ message: string }>('/api/v1/account/password', {
