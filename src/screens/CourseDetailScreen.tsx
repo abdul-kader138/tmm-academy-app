@@ -13,7 +13,6 @@ import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useIsFocused } from '@react-navigation/native';
 import { StatusBar } from 'expo-status-bar';
-import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Colors, cardShadow } from '../theme/colors';
 import { lmsApi, API_BASE_URL } from '../api/lmsApi';
@@ -58,14 +57,20 @@ export const CourseDetailScreen: React.FC<{ route: any; navigation: any }> = ({
           style={StyleSheet.absoluteFill}
         />
 
-        {/* Top Status Bar Blur Overlay (Compact & Subtle) */}
-        <BlurView
-          intensity={20}
-          tint="dark"
-          style={[
-            styles.statusBarBlur,
-            { height: insets.top > 0 ? insets.top : (Platform.OS === 'android' ? 24 : 44) },
+        {/* Top Status Bar Gradient Scrim (Smooth seamless fade) */}
+        <LinearGradient
+          colors={[
+            'rgba(15, 23, 42, 0.75)',
+            'rgba(15, 23, 42, 0.42)',
+            'rgba(15, 23, 42, 0.12)',
+            'transparent',
           ]}
+          locations={[0, 0.35, 0.7, 1]}
+          style={[
+            styles.topGradientScrim,
+            { height: insets.top + (Platform.OS === 'ios' ? 44 : 48) },
+          ]}
+          pointerEvents="none"
         />
 
         {/* Top Navbar */}
@@ -207,14 +212,12 @@ const styles = StyleSheet.create({
     position: 'relative',
     justifyContent: 'flex-end',
   },
-  statusBarBlur: {
+  topGradientScrim: {
     position: 'absolute',
     top: 0,
     left: 0,
     right: 0,
-    zIndex: 5,
-    overflow: 'hidden',
-    backgroundColor: 'rgba(15, 23, 42, 0.16)',
+    zIndex: 6,
   },
   coverImage: {
     width: '100%',
