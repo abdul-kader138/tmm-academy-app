@@ -8,11 +8,12 @@ import {
   RefreshControl,
   ActivityIndicator,
   Platform,
+  Image,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors, cardShadow } from '../theme/colors';
-import { lmsApi } from '../api/lmsApi';
+import { lmsApi, normalizeAvatarUrl } from '../api/lmsApi';
 import { DashboardSummary } from '../api/types';
 import { useAuth } from '../context/AuthContext';
 
@@ -22,6 +23,11 @@ export const DashboardScreen: React.FC<{ navigation: any }> = ({ navigation }) =
   const [dashboard, setDashboard] = useState<DashboardSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [avatarLoadFailed, setAvatarLoadFailed] = useState(false);
+
+  useEffect(() => {
+    setAvatarLoadFailed(false);
+  }, [user?.avatar_url]);
 
   const fetchDashboard = async () => {
     try {
@@ -69,7 +75,19 @@ export const DashboardScreen: React.FC<{ navigation: any }> = ({ navigation }) =
           onPress={() => navigation.navigate('AccountTab')}
           activeOpacity={0.7}
         >
-          <Ionicons name="person-circle" size={38} color={Colors.signal} />
+          {user?.avatar_url && !avatarLoadFailed ? (
+            <Image
+              source={{ uri: normalizeAvatarUrl(user.avatar_url) || user.avatar_url }}
+              style={styles.avatarImage}
+              onError={() => setAvatarLoadFailed(true)}
+            />
+          ) : (
+            <View style={styles.avatarFallback}>
+              <Text style={styles.avatarFallbackText}>
+                {user?.first_name ? user.first_name[0].toUpperCase() : 'L'}
+              </Text>
+            </View>
+          )}
         </TouchableOpacity>
       </View>
 
@@ -237,6 +255,28 @@ const styles = StyleSheet.create({
   },
   profileBadge: {
     padding: 2,
+  },
+  avatarImage: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    borderWidth: 2,
+    borderColor: '#E0F2FE',
+  },
+  avatarFallback: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: Colors.signal,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: '#E0F2FE',
+  },
+  avatarFallbackText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '800',
   },
   scrollContent: {
     padding: 16,
