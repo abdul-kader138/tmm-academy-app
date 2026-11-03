@@ -38,9 +38,46 @@ export const WelcomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => 
     ).start();
   }, [floatAnim]);
 
+  // Featured Career Tracks Carousel Data
+  const featuredTracks = [
+    {
+      id: 'boc-12',
+      badge: 'TOP TRACK',
+      title: 'BOC-12 বিজনেস অপরচুনিটি কোর্স',
+      desc: 'ইমিগ্রেশন ও লিগ্যাল প্রসেস, ট্যাক্স রিটার্ন (730/UNICO) ও পার্তিতা ইভা খোলার কমপ্লিট সমাধান।',
+      duration: '83 hrs',
+      lessons: '3 Modules',
+      rating: '4.9 ★',
+      badgeColor: '#0E7490',
+      badgeBg: '#ECFEFF',
+    },
+    {
+      id: 'contabilita',
+      badge: 'FINANCIAL SKILL',
+      title: 'Contabilità (কন্তাবিলিতা) কমপ্লিট কোর্স',
+      desc: 'বাংলা ভাষায় সম্পূর্ণ হিসাবরক্ষণ, ভ্যাট ইনভয়েস ও ছোট-মাঝারি ব্যবসার জন্য নিখুঁত ট্যাক্স কৌশল।',
+      duration: '45 hrs',
+      lessons: 'Full Series',
+      rating: '5.0 ★',
+      badgeColor: '#059669',
+      badgeBg: '#ECFDF5',
+    },
+    {
+      id: 'colf-badanti',
+      badge: 'JOB READY',
+      title: 'Colf, Badanti ও Lavoro Domestico',
+      desc: 'ইতালিতে পেশাদার ও আইনসম্মত গৃহসেবা প্রশিক্ষণ, কন্ট্রাক্ট ও অধিকার বিষয়ক বাস্তব গাইড।',
+      duration: '30 hrs',
+      lessons: 'Certification',
+      rating: '4.8 ★',
+      badgeColor: '#7C3AED',
+      badgeBg: '#F5F3FF',
+    },
+  ];
+
   return (
     <View style={styles.container}>
-      {/* Top Navbar — Clean Brand Header (Sign In button removed from top) */}
+      {/* Top Navbar — Pure Brand Logo & Title (EN/BN and duplicate sign-in removed) */}
       <View
         style={[
           styles.navbar,
@@ -60,19 +97,13 @@ export const WelcomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => 
             <Text style={styles.brandSub}>LEARN, PRACTICE, AND EARN CERTIFICATES.</Text>
           </View>
         </View>
-
-        {/* Clean Language / Region Indicator */}
-        <View style={styles.langIndicator}>
-          <Ionicons name="globe-outline" size={14} color={Colors.signal} />
-          <Text style={styles.langIndicatorText}>EN / BN</Text>
-        </View>
       </View>
 
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={[
           styles.scrollBody,
-          { paddingBottom: insets.bottom + 28 },
+          { paddingBottom: insets.bottom + 32 },
         ]}
       >
         {/* Hero Section */}
@@ -86,7 +117,7 @@ export const WelcomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => 
             A calm, distraction-free learning space designed for modern professionals. Practical video modules, real-world project reviews, and verifiable industry certificates.
           </Text>
 
-          {/* Action Buttons: Browse Courses & Single Sign In */}
+          {/* Action Buttons: Browse Courses & Single Clean Sign In */}
           <View style={styles.actionRow}>
             <TouchableOpacity
               style={[styles.primaryBrowseBtn, cardShadow(2)]}
@@ -196,6 +227,95 @@ export const WelcomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => 
             </TouchableOpacity>
           </ScrollView>
         </View>
+
+        {/* ================= EXTRA RICH FEATURES ADDED BELOW AVAILABLE COURSES ================= */}
+
+        {/* 1. Featured Career Tracks Horizontal Carousel */}
+        <View style={styles.tracksCarouselHeader}>
+          <Text style={styles.subSectionTitle}>Featured Career Tracks</Text>
+          <Text style={styles.subSectionSubtitle}>
+            Swipe through in-demand executive programs tailored for Italy
+          </Text>
+        </View>
+
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.tracksCarouselScroll}
+        >
+          {featuredTracks.map((item) => (
+            <TouchableOpacity
+              key={item.id}
+              style={[styles.trackCard, cardShadow(1)]}
+              onPress={() => navigation.navigate('MainTabs')}
+              activeOpacity={0.88}
+            >
+              <View style={[styles.trackBadge, { backgroundColor: item.badgeBg }]}>
+                <Text style={[styles.trackBadgeText, { color: item.badgeColor }]}>{item.badge}</Text>
+              </View>
+
+              <Text style={styles.trackTitle} numberOfLines={2}>
+                {item.title}
+              </Text>
+
+              <Text style={styles.trackDesc} numberOfLines={3}>
+                {item.desc}
+              </Text>
+
+              <View style={styles.trackFooter}>
+                <View style={styles.trackMeta}>
+                  <Ionicons name="time-outline" size={13} color={Colors.textMuted} />
+                  <Text style={styles.trackMetaText}>{item.duration}</Text>
+                </View>
+                <View style={styles.trackMeta}>
+                  <Ionicons name="play-circle-outline" size={13} color={Colors.signal} />
+                  <Text style={styles.trackMetaText}>{item.lessons}</Text>
+                </View>
+                <Text style={styles.trackRating}>{item.rating}</Text>
+              </View>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+
+        {/* 2. Built for Your Mobile Routine — 3 App Advantages */}
+        <View style={styles.perksSection}>
+          <Text style={styles.subSectionTitle}>Built for Your Mobile Routine</Text>
+          <Text style={styles.subSectionSubtitle}>
+            Learn anytime on your smartphone with seamless cloud synchronization
+          </Text>
+
+          <View style={styles.perksGrid}>
+            <View style={[styles.perkCard, cardShadow(1)]}>
+              <View style={[styles.perkIconWrap, { backgroundColor: '#ECFEFF' }]}>
+                <Ionicons name="phone-portrait-outline" size={20} color="#0E7490" />
+              </View>
+              <Text style={styles.perkTitle}>Mobile Video Player</Text>
+              <Text style={styles.perkDesc}>
+                Auto-saves your progress as you watch; auto-completes lessons at 90% runtime.
+              </Text>
+            </View>
+
+            <View style={[styles.perkCard, cardShadow(1)]}>
+              <View style={[styles.perkIconWrap, { backgroundColor: '#ECFDF5' }]}>
+                <Ionicons name="ribbon-outline" size={20} color="#059669" />
+              </View>
+              <Text style={styles.perkTitle}>Instant Verifiable Diplomas</Text>
+              <Text style={styles.perkDesc}>
+                Complete quizzes & exams to immediately download official, tamper-evident PDF certificates.
+              </Text>
+            </View>
+
+            <View style={[styles.perkCard, cardShadow(1)]}>
+              <View style={[styles.perkIconWrap, { backgroundColor: '#FDF4FF' }]}>
+                <Ionicons name="chatbubbles-outline" size={20} color="#A21CAF" />
+              </View>
+              <Text style={styles.perkTitle}>Interactive Mentor Q&A</Text>
+              <Text style={styles.perkDesc}>
+                Ask questions and interact directly with instructors in lesson comment threads.
+              </Text>
+            </View>
+          </View>
+        </View>
       </ScrollView>
     </View>
   );
@@ -240,22 +360,6 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: Colors.signal,
     letterSpacing: 0.6,
-  },
-  langIndicator: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: Colors.signalTint,
-    borderWidth: 1,
-    borderColor: Colors.signalTintBorder,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 14,
-    gap: 4,
-  },
-  langIndicatorText: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: Colors.signal,
   },
 
   scrollBody: {
@@ -378,7 +482,7 @@ const styles = StyleSheet.create({
 
   /* Available courses section */
   coursesSectionHeader: {
-    marginBottom: 10,
+    marginBottom: 20,
   },
   sectionTitle: {
     fontSize: 22,
@@ -418,5 +522,123 @@ const styles = StyleSheet.create({
   filterPillTextActive: {
     color: Colors.signal,
     fontWeight: '700',
+  },
+
+  /* Extra Features Added Below Available Courses */
+  tracksCarouselHeader: {
+    marginTop: 10,
+    marginBottom: 10,
+  },
+  subSectionTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: Colors.textMain,
+    letterSpacing: -0.3,
+    marginBottom: 4,
+  },
+  subSectionSubtitle: {
+    fontSize: 12.5,
+    color: Colors.textSecondary,
+    lineHeight: 18,
+  },
+  tracksCarouselScroll: {
+    paddingRight: 10,
+    paddingBottom: 6,
+    gap: 12,
+    marginTop: 8,
+    marginBottom: 24,
+  },
+  trackCard: {
+    width: SCREEN_WIDTH * 0.72,
+    backgroundColor: Colors.surface,
+    borderRadius: 14,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: Colors.borderSubtle,
+    justifyContent: 'space-between',
+  },
+  trackBadge: {
+    alignSelf: 'flex-start',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+    marginBottom: 10,
+  },
+  trackBadgeText: {
+    fontSize: 9.5,
+    fontWeight: '800',
+    letterSpacing: 0.4,
+  },
+  trackTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: Colors.textMain,
+    lineHeight: 20,
+    marginBottom: 6,
+  },
+  trackDesc: {
+    fontSize: 12,
+    color: Colors.textSecondary,
+    lineHeight: 17,
+    marginBottom: 14,
+  },
+  trackFooter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingTop: 10,
+    borderTopWidth: 1,
+    borderTopColor: Colors.borderLight,
+  },
+  trackMeta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  trackMetaText: {
+    fontSize: 11,
+    color: Colors.textMuted,
+    fontWeight: '600',
+  },
+  trackRating: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: Colors.star,
+  },
+
+  /* Perks Section */
+  perksSection: {
+    marginTop: 6,
+    marginBottom: 10,
+  },
+  perksGrid: {
+    marginTop: 12,
+    gap: 10,
+  },
+  perkCard: {
+    backgroundColor: Colors.surface,
+    borderRadius: 12,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: Colors.borderSubtle,
+  },
+  perkIconWrap: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 8,
+  },
+  perkTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: Colors.textMain,
+    marginBottom: 4,
+  },
+  perkDesc: {
+    fontSize: 12,
+    color: Colors.textSecondary,
+    lineHeight: 17,
   },
 });
