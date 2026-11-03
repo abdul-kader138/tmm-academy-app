@@ -54,17 +54,17 @@ export const CourseDetailScreen: React.FC<{ route: any; navigation: any }> = ({
       <View style={styles.coverWrapper}>
         <Image source={{ uri: imageUrl }} style={styles.coverImage} resizeMode="cover" />
         <LinearGradient
-          colors={['rgba(15, 23, 42, 0.35)', 'rgba(15, 23, 42, 0.85)']}
+          colors={['rgba(15, 23, 42, 0.15)', 'rgba(15, 23, 42, 0.85)']}
           style={StyleSheet.absoluteFill}
         />
 
-        {/* Top Status Bar Blur Overlay */}
+        {/* Top Status Bar Blur Overlay (Compact & Subtle) */}
         <BlurView
-          intensity={45}
+          intensity={20}
           tint="dark"
           style={[
             styles.statusBarBlur,
-            { height: insets.top + (Platform.OS === 'ios' ? 4 : 8) },
+            { height: insets.top > 0 ? insets.top : (Platform.OS === 'android' ? 24 : 44) },
           ]}
         />
 
@@ -214,7 +214,7 @@ const styles = StyleSheet.create({
     right: 0,
     zIndex: 5,
     overflow: 'hidden',
-    backgroundColor: 'rgba(15, 23, 42, 0.4)',
+    backgroundColor: 'rgba(15, 23, 42, 0.16)',
   },
   coverImage: {
     width: '100%',
