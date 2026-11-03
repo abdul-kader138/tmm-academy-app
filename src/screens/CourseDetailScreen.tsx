@@ -11,6 +11,9 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useIsFocused } from '@react-navigation/native';
+import { StatusBar } from 'expo-status-bar';
+import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Colors, cardShadow } from '../theme/colors';
 import { lmsApi, API_BASE_URL } from '../api/lmsApi';
@@ -21,6 +24,7 @@ export const CourseDetailScreen: React.FC<{ route: any; navigation: any }> = ({
   navigation,
 }) => {
   const insets = useSafeAreaInsets();
+  const isFocused = useIsFocused();
   const initialCourse: CourseCatalogItem = route.params?.course;
   const [detail, setDetail] = useState<CourseDetail | null>(null);
   const [loading, setLoading] = useState(true);
@@ -44,12 +48,24 @@ export const CourseDetailScreen: React.FC<{ route: any; navigation: any }> = ({
 
   return (
     <View style={styles.container}>
+      {isFocused && <StatusBar style="light" animated />}
+
       {/* Cover Header (Fixed at top) */}
       <View style={styles.coverWrapper}>
         <Image source={{ uri: imageUrl }} style={styles.coverImage} resizeMode="cover" />
         <LinearGradient
-          colors={['rgba(15, 23, 42, 0.25)', 'rgba(15, 23, 42, 0.85)']}
+          colors={['rgba(15, 23, 42, 0.35)', 'rgba(15, 23, 42, 0.85)']}
           style={StyleSheet.absoluteFill}
+        />
+
+        {/* Top Status Bar Blur Overlay */}
+        <BlurView
+          intensity={45}
+          tint="dark"
+          style={[
+            styles.statusBarBlur,
+            { height: insets.top + (Platform.OS === 'ios' ? 4 : 8) },
+          ]}
         />
 
         {/* Top Navbar */}
@@ -190,6 +206,15 @@ const styles = StyleSheet.create({
     height: 260,
     position: 'relative',
     justifyContent: 'flex-end',
+  },
+  statusBarBlur: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    zIndex: 5,
+    overflow: 'hidden',
+    backgroundColor: 'rgba(15, 23, 42, 0.4)',
   },
   coverImage: {
     width: '100%',
