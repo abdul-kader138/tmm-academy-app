@@ -568,12 +568,22 @@ class LmsApiClient {
   /**
    * 2FA Step 1: Generate candidate secret and QR code SVG
    */
-  async setupTwoFactor(): Promise<{ success: boolean; data?: TwoFactorSetupResponse; error?: string }> {
+  async setupTwoFactor(): Promise<{
+    success: boolean;
+    data?: TwoFactorSetupResponse;
+    error?: string;
+    alreadyEnabled?: boolean;
+  }> {
     await this.ensureCsrf();
     const res = await this.request<TwoFactorSetupResponse>('/api/v1/account/two-factor/setup', {
       method: 'POST',
+      body: JSON.stringify({}),
     });
     if (res.error) {
+      const msg = (res.error || '').toLowerCase();
+      if (res.status === 422 || msg.includes('already enabled') || msg.includes('active') || msg.includes('enabled')) {
+        return { success: true, alreadyEnabled: true, error: res.error };
+      }
       return { success: false, error: res.error };
     }
     return { success: true, data: res.data };

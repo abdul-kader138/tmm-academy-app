@@ -30,7 +30,7 @@ interface AuthContextType {
   resendVerification: () => Promise<{ success: boolean; message?: string; error?: string }>;
   updateProfile: (payload: UpdateProfilePayload) => Promise<{ success: boolean; error?: string }>;
   changePassword: (payload: ChangePasswordPayload) => Promise<{ success: boolean; message?: string; error?: string }>;
-  setup2FA: () => Promise<{ success: boolean; data?: TwoFactorSetupResponse; error?: string }>;
+  setup2FA: () => Promise<{ success: boolean; data?: TwoFactorSetupResponse; error?: string; alreadyEnabled?: boolean }>;
   confirm2FA: (secret: string, code: string) => Promise<{ success: boolean; data?: TwoFactorConfirmResponse; error?: string }>;
   disable2FA: (password: string) => Promise<{ success: boolean; message?: string; error?: string }>;
   regenerateRecoveryCodes: (password: string) => Promise<{ success: boolean; data?: TwoFactorConfirmResponse; error?: string }>;
@@ -157,7 +157,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const setup2FA = async () => {
-    return lmsApi.setupTwoFactor();
+    const res = await lmsApi.setupTwoFactor();
+    if (res.alreadyEnabled) {
+      await refreshUser();
+    }
+    return res;
   };
 
   const confirm2FA = async (secret: string, code: string) => {

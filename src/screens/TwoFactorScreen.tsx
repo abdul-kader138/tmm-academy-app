@@ -19,6 +19,77 @@ import { Colors, cardShadow } from '../theme/colors';
 import { useAuth } from '../context/AuthContext';
 import { TwoFactorSetupResponse } from '../api/types';
 
+const buildQrHtml = (
+  qrSvg?: string | null,
+  secret?: string | null,
+  userEmail?: string | null
+): string => {
+  let contentHtml = '';
+  const trimmed = (qrSvg || '').trim();
+
+  if (trimmed.startsWith('data:') || trimmed.startsWith('http')) {
+    contentHtml = `<img src="${trimmed}" alt="2FA QR Code" />`;
+  } else if (trimmed.includes('<svg')) {
+    // Strip XML declaration <?xml ...?> so it renders cleanly as inline SVG
+    const cleaned = trimmed.replace(/<\?xml[^>]*\?>/gi, '').trim();
+    contentHtml = `<div class="svg-wrapper">${cleaned}</div>`;
+  } else if (trimmed.length > 50 && (trimmed.startsWith('PHN2Zy') || /^[A-Za-z0-9+/=]+$/.test(trimmed))) {
+    contentHtml = `<img src="data:image/svg+xml;base64,${trimmed}" alt="2FA QR Code" />`;
+  } else if (secret) {
+    const otpUri = `otpauth://totp/TMM%20Academy:${encodeURIComponent(userEmail || 'Learner')}?secret=${encodeURIComponent(secret)}&issuer=TMM%20Academy`;
+    const fallbackUrl = `https://api.qrserver.com/v1/create-qr-code/?size=240x240&margin=4&data=${encodeURIComponent(otpUri)}`;
+    contentHtml = `<img src="${fallbackUrl}" alt="2FA QR Code" />`;
+  } else {
+    contentHtml = '<p style="color:#64748B;font-size:12px;font-family:sans-serif;">Generating QR Code...</p>';
+  }
+
+  return `<!DOCTYPE html>
+<html>
+<head>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <style>
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      background: #FFFFFF;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+    }
+    .svg-wrapper {
+      width: 100%;
+      height: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    svg {
+      width: 92% !important;
+      height: 92% !important;
+      max-width: 100%;
+      max-height: 100%;
+      display: block;
+      margin: auto;
+    }
+    img {
+      width: 92% !important;
+      height: 92% !important;
+      object-fit: contain;
+      display: block;
+      margin: auto;
+    }
+  </style>
+</head>
+<body>
+  ${contentHtml}
+</body>
+</html>`;
+};
+
 export const TwoFactorScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   const insets = useSafeAreaInsets();
   const { user, setup2FA, confirm2FA, disable2FA, regenerateRecoveryCodes, refreshUser } = useAuth();
@@ -47,11 +118,17 @@ export const TwoFactorScreen: React.FC<{ navigation: any }> = ({ navigation }) =
     setLoading(true);
     try {
       const res = await setup2FA();
+      if (res.alreadyEnabled) {
+        await refreshUser();
+        return;
+      }
       if (res.success && res.data) {
         setSetupData(res.data);
       } else {
         Alert.alert('Setup Error', res.error || 'Could not initiate 2FA setup.');
       }
+    } catch (e: any) {
+      Alert.alert('Setup Error', e?.message || 'Network error initiating 2FA.');
     } finally {
       setLoading(false);
     }
@@ -372,17 +449,30 @@ export const TwoFactorScreen: React.FC<{ navigation: any }> = ({ navigation }) =
                       Open Google Authenticator, 1Password, or Authy on your phone and scan this code:
                     </Text>
 
-                    {setupData?.qr_code_svg ? (
-                      <View style={styles.qrWrapper}>
+                    {/* Vector QR Code Display (TMS Style) */}
+                    <View style={styles.qrContainerWrapper}>
+                      <View style={styles.qrBox}>
                         <WebView
+                          originWhitelist={['*']}
                           source={{
-                            html: `<html><body style="margin:0;display:flex;justify-content:center;align-items:center;background:#FFFFFF;">${setupData.qr_code_svg}</body></html>`,
+                            html: buildQrHtml(setupData?.qr_code_svg, setupData?.secret, user?.email),
                           }}
-                          style={{ width: 170, height: 170, backgroundColor: 'transparent' }}
+                          style={styles.qrWebView}
                           scrollEnabled={false}
+                          javaScriptEnabled={true}
+                          domStorageEnabled={true}
+                          scalesPageToFit={true}
                         />
                       </View>
-                    ) : null}
+                      <TouchableOpacity
+                        style={styles.reloadRow}
+                        onPress={loadSetupData}
+                        activeOpacity={0.7}
+                      >
+                        <Ionicons name="refresh-outline" size={13} color={Colors.signal} />
+                        <Text style={styles.reloadText}>Regenerate or Refresh QR</Text>
+                      </TouchableOpacity>
+                    </View>
 
                     {setupData?.secret ? (
                       <View style={styles.secretBox}>
@@ -566,15 +656,41 @@ const styles = StyleSheet.create({
     lineHeight: 17,
     marginBottom: 12,
   },
-  qrWrapper: {
+  qrContainerWrapper: {
     alignItems: 'center',
-    justifyContent: 'center',
+    marginVertical: 12,
+  },
+  qrBox: {
+    width: 190,
+    height: 190,
+    borderRadius: 16,
+    overflow: 'hidden',
     backgroundColor: '#FFFFFF',
-    padding: 12,
-    borderRadius: 14,
+    padding: 6,
     borderWidth: 1,
     borderColor: Colors.borderSubtle,
-    marginVertical: 10,
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  qrWebView: {
+    flex: 1,
+    backgroundColor: '#FFFFFF',
+  },
+  reloadRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginTop: 8,
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+  },
+  reloadText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: Colors.signal,
   },
   secretBox: {
     backgroundColor: Colors.surfaceElevated,
