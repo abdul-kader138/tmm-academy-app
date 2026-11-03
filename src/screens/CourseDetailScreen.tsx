@@ -45,10 +45,13 @@ export const CourseDetailScreen: React.FC<{ route: any; navigation: any }> = ({
   return (
     <View style={styles.container}>
       <ScrollView
-        contentContainerStyle={{
-          paddingBottom: insets.bottom + 90,
-        }}
+        style={styles.mainScrollView}
+        contentContainerStyle={[
+          styles.mainScrollContent,
+          { paddingBottom: Math.max(insets.bottom, 20) + 95 },
+        ]}
         showsVerticalScrollIndicator={false}
+        nestedScrollEnabled={true}
       >
         {/* Cover Header */}
         <View style={styles.coverWrapper}>
@@ -105,9 +108,35 @@ export const CourseDetailScreen: React.FC<{ route: any; navigation: any }> = ({
             </View>
           </View>
 
-          {/* About Section */}
-          <Text style={styles.sectionHeading}>About this Course</Text>
-          <Text style={styles.descriptionText}>{course.description}</Text>
+          {/* About Section with Scrollable Description Box */}
+          <View style={[styles.aboutCard, cardShadow(1)]}>
+            <View style={styles.aboutHeader}>
+              <View style={styles.aboutHeaderTitleRow}>
+                <Ionicons name="document-text-outline" size={18} color={Colors.signal} />
+                <Text style={styles.aboutSectionHeading}>About this Course</Text>
+              </View>
+              <View style={styles.scrollBadge}>
+                <Ionicons name="swap-vertical-outline" size={12} color={Colors.signal} />
+                <Text style={styles.scrollBadgeText}>Scrollable</Text>
+              </View>
+            </View>
+
+            <View style={styles.descScrollContainer}>
+              <ScrollView
+                style={styles.descScrollView}
+                contentContainerStyle={styles.descScrollContent}
+                nestedScrollEnabled={true}
+                showsVerticalScrollIndicator={true}
+                persistentScrollbar={true}
+                bounces={true}
+                overScrollMode="always"
+              >
+                <Text style={styles.descriptionText} selectable={true}>
+                  {course.description || 'No description available for this course.'}
+                </Text>
+              </ScrollView>
+            </View>
+          </View>
 
           {/* Syllabus / Sections */}
           {loading ? (
@@ -180,6 +209,12 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: Colors.canvas,
+  },
+  mainScrollView: {
+    flex: 1,
+  },
+  mainScrollContent: {
+    flexGrow: 1,
   },
   coverWrapper: {
     width: '100%',
@@ -271,6 +306,61 @@ const styles = StyleSheet.create({
     fontSize: 17,
     fontWeight: '700',
     marginBottom: 10,
+  },
+  aboutCard: {
+    backgroundColor: Colors.surface,
+    borderRadius: 16,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: Colors.borderSubtle,
+    marginBottom: 20,
+  },
+  aboutHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 12,
+  },
+  aboutHeaderTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  aboutSectionHeading: {
+    color: Colors.textMain,
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  scrollBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: 'rgba(236, 254, 255, 0.95)',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(14, 116, 144, 0.2)',
+  },
+  scrollBadgeText: {
+    color: Colors.signal,
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  descScrollContainer: {
+    maxHeight: 220,
+    backgroundColor: Colors.canvas,
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderWidth: 1,
+    borderColor: Colors.borderSubtle,
+  },
+  descScrollView: {
+    maxHeight: 196,
+  },
+  descScrollContent: {
+    paddingRight: 4,
   },
   descriptionText: {
     color: Colors.textSecondary,
