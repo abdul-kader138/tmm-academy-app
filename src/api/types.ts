@@ -140,6 +140,7 @@ export interface CertificateItem {
   certificate_number: string;
   issued_at: string;
   download_url?: string;
+  verify_url?: string;
 }
 
 export interface DashboardSummary {

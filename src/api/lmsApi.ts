@@ -566,11 +566,22 @@ class LmsApiClient {
 
   async getCertificates(): Promise<CertificateItem[]> {
     const res = await this.request<any>('/api/v1/certificates');
+    console.log('[lmsApi] getCertificates status:', res.status, 'hasData:', Boolean(res.data));
     if (!res.data) return [];
-    if (Array.isArray(res.data.certificates)) return res.data.certificates;
-    if (Array.isArray(res.data.data)) return res.data.data;
-    if (Array.isArray(res.data)) return res.data;
-    return [];
+    let list: any[] = [];
+    if (Array.isArray(res.data.certificates)) list = res.data.certificates;
+    else if (Array.isArray(res.data.data)) list = res.data.data;
+    else if (Array.isArray(res.data)) list = res.data;
+
+    return list.map((item: any) => ({
+      id: item.id,
+      course_id: item.course?.id || item.course_id || 0,
+      course_title: item.course?.title || item.course_title || 'Course Certificate',
+      certificate_number: item.certificate_number,
+      issued_at: item.issued_at,
+      download_url: item.download_url || `${API_BASE_URL}/api/v1/certificates/${item.id}/download`,
+      verify_url: item.verify_url,
+    }));
   }
 
   getCertificateDownloadUrl(certificateId: number | string): string {

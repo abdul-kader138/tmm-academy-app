@@ -94,6 +94,21 @@ export const CertificatesScreen: React.FC<{ navigation?: any }> = ({ navigation 
     );
   }
 
+  const formatDate = (raw?: string) => {
+    if (!raw) return '';
+    try {
+      const d = new Date(raw);
+      if (isNaN(d.getTime())) return raw;
+      return d.toLocaleDateString(undefined, {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+      });
+    } catch {
+      return raw;
+    }
+  };
+
   const renderCertItem = ({ item }: { item: CertificateItem }) => (
     <View style={[styles.certCard, cardShadow(2)]}>
       <View style={styles.ribbonBadge}>
@@ -101,19 +116,36 @@ export const CertificatesScreen: React.FC<{ navigation?: any }> = ({ navigation 
       </View>
 
       <View style={styles.certBody}>
-        <Text style={styles.courseTitle}>{item.course_title || 'Course Certificate'}</Text>
+        <Text style={styles.courseTitle}>{item.course_title}</Text>
         <Text style={styles.certNumber}>ID: {item.certificate_number}</Text>
-        <Text style={styles.issuedDate}>Issued: {item.issued_at}</Text>
+        <Text style={styles.issuedDate}>Issued: {formatDate(item.issued_at)}</Text>
       </View>
 
-      <TouchableOpacity
-        style={styles.downloadBtn}
-        onPress={() => handleDownload(item)}
-        activeOpacity={0.8}
-      >
-        <Ionicons name="download-outline" size={16} color="#FFFFFF" />
-        <Text style={styles.downloadText}>PDF</Text>
-      </TouchableOpacity>
+      <View style={styles.actionCol}>
+        <TouchableOpacity
+          style={styles.downloadBtn}
+          onPress={() => handleDownload(item)}
+          activeOpacity={0.8}
+        >
+          <Ionicons name="download-outline" size={15} color="#FFFFFF" />
+          <Text style={styles.downloadText}>PDF</Text>
+        </TouchableOpacity>
+
+        {item.verify_url ? (
+          <TouchableOpacity
+            style={styles.verifyBtn}
+            onPress={() => {
+              if (item.verify_url) {
+                void Linking.openURL(item.verify_url);
+              }
+            }}
+            activeOpacity={0.7}
+          >
+            <Ionicons name="shield-checkmark-outline" size={12} color={Colors.emerald} />
+            <Text style={styles.verifyText}>Verify</Text>
+          </TouchableOpacity>
+        ) : null}
+      </View>
     </View>
   );
 
@@ -244,6 +276,10 @@ const styles = StyleSheet.create({
     color: Colors.textMuted,
     fontSize: 11,
   },
+  actionCol: {
+    alignItems: 'flex-end',
+    gap: 6,
+  },
   downloadBtn: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -256,6 +292,20 @@ const styles = StyleSheet.create({
   downloadText: {
     color: '#FFFFFF',
     fontSize: 12,
+    fontWeight: '700',
+  },
+  verifyBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+    backgroundColor: 'rgba(16, 185, 129, 0.1)',
+  },
+  verifyText: {
+    color: Colors.emerald,
+    fontSize: 11,
     fontWeight: '700',
   },
   emptyCard: {
