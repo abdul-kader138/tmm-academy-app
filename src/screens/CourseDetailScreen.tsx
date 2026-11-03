@@ -8,6 +8,8 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   Platform,
+  Alert,
+  Linking,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -17,6 +19,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Colors, cardShadow } from '../theme/colors';
 import { lmsApi, API_BASE_URL } from '../api/lmsApi';
 import { CourseCatalogItem, CourseDetail } from '../api/types';
+import { useAuth } from '../context/AuthContext';
 
 export const CourseDetailScreen: React.FC<{ route: any; navigation: any }> = ({
   route,
@@ -24,6 +27,7 @@ export const CourseDetailScreen: React.FC<{ route: any; navigation: any }> = ({
 }) => {
   const insets = useSafeAreaInsets();
   const isFocused = useIsFocused();
+  const { user } = useAuth();
   const initialCourse: CourseCatalogItem = route.params?.course;
   const [detail, setDetail] = useState<CourseDetail | null>(null);
   const [loading, setLoading] = useState(true);
@@ -176,7 +180,11 @@ export const CourseDetailScreen: React.FC<{ route: any; navigation: any }> = ({
         <View style={styles.statusCol}>
           <Text style={styles.statusLabel}>Enrollment</Text>
           <Text style={styles.statusValue}>
-            {course.is_enrolled ? 'Active Student' : 'Open for Enrollment'}
+            {course.is_enrolled
+              ? 'Active Student'
+              : user
+              ? 'Available'
+              : 'Open for Enrollment'}
           </Text>
         </View>
 
@@ -186,13 +194,31 @@ export const CourseDetailScreen: React.FC<{ route: any; navigation: any }> = ({
           onPress={() => {
             if (course.is_enrolled) {
               navigation.navigate('MainTabs', { screen: 'DashboardTab' });
+            } else if (user) {
+              Alert.alert(
+                'Enroll in Course',
+                `Ready to enroll in "${course.title}"?`,
+                [
+                  { text: 'Cancel', style: 'cancel' },
+                  {
+                    text: 'Continue to Enroll',
+                    onPress: () => {
+                      void Linking.openURL(`https://academy.tmminnovation.com/courses/${course.slug}`);
+                    },
+                  },
+                ]
+              );
             } else {
               navigation.navigate('Login');
             }
           }}
         >
           <Text style={styles.actionBtnText}>
-            {course.is_enrolled ? 'Go to Classroom' : 'Enroll / Sign In'}
+            {course.is_enrolled
+              ? 'Go to Classroom'
+              : user
+              ? 'Enroll Now'
+              : 'Enroll / Sign In'}
           </Text>
           <Ionicons name="arrow-forward" size={16} color="#FFFFFF" />
         </TouchableOpacity>
