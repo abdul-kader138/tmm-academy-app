@@ -17,15 +17,124 @@ import { getDeviceId, getDeviceName } from '../utils/deviceInfo';
 export const API_BASE_URL = 'https://academy.tmminnovation.com';
 
 const TOKEN_KEY = '@tmm_academy_auth_token';
+const COOKIES_KEY = '@tmm_academy_cookies';
+const XSRF_KEY = '@tmm_academy_xsrf';
 
 class LmsApiClient {
   private token: string | null = null;
+  private cookies: Map<string, string> = new Map();
+  private xsrfToken: string | null = null;
+  private csrfInitialized: boolean = false;
 
   async init() {
     try {
       this.token = await AsyncStorage.getItem(TOKEN_KEY);
+      const savedCookies = await AsyncStorage.getItem(COOKIES_KEY);
+      if (savedCookies) {
+        const parsed = JSON.parse(savedCookies);
+        this.cookies = new Map(Object.entries(parsed));
+      }
+      this.xsrfToken = await AsyncStorage.getItem(XSRF_KEY);
     } catch {
       this.token = null;
+    }
+  }
+
+  private async persistCookies() {
+    try {
+      const obj = Object.fromEntries(this.cookies.entries());
+      await AsyncStorage.setItem(COOKIES_KEY, JSON.stringify(obj));
+      if (this.xsrfToken) {
+        await AsyncStorage.setItem(XSRF_KEY, this.xsrfToken);
+      } else {
+        await AsyncStorage.removeItem(XSRF_KEY);
+      }
+    } catch {}
+  }
+
+  private parseAndStoreCookies(response: Response) {
+    try {
+      let setCookieList: string[] = [];
+      if (typeof (response.headers as any).getSetCookie === 'function') {
+        setCookieList = (response.headers as any).getSetCookie();
+      } else if (typeof (response.headers as any).raw === 'function') {
+        const raw = (response.headers as any).raw()['set-cookie'];
+        if (Array.isArray(raw)) setCookieList = raw;
+      }
+
+      if (setCookieList.length === 0) {
+        const raw = response.headers.get('set-cookie');
+        if (raw) {
+          setCookieList = raw.split(/,(?=\s*[a-zA-Z0-9_\-]+=)/g);
+        }
+      }
+
+      let changed = false;
+      for (const cookieStr of setCookieList) {
+        const clean = cookieStr.trim();
+        if (!clean) continue;
+        const [cookiePart] = clean.split(';');
+        const eqIdx = cookiePart.indexOf('=');
+        if (eqIdx > 0) {
+          const name = cookiePart.slice(0, eqIdx).trim();
+          const val = cookiePart.slice(eqIdx + 1).trim();
+          this.cookies.set(name, val);
+          changed = true;
+          if (name === 'XSRF-TOKEN') {
+            try {
+              this.xsrfToken = decodeURIComponent(val);
+            } catch {
+              this.xsrfToken = val;
+            }
+          }
+        }
+      }
+
+      if (changed) {
+        void this.persistCookies();
+      }
+    } catch (e) {
+      console.warn('Error parsing cookies:', e);
+    }
+  }
+
+  private getCookieHeader(): string {
+    return Array.from(this.cookies.entries())
+      .map(([k, v]) => `${k}=${v}`)
+      .join('; ');
+  }
+
+  /**
+   * Initializes or refreshes Laravel Sanctum session and CSRF cookie.
+   * Required for stateful operations like login/register to prevent
+   * 'Session store not set on request' errors in Laravel.
+   */
+  async ensureCsrf(forceRefresh = false): Promise<void> {
+    if (this.csrfInitialized && !forceRefresh && this.cookies.has('tmm-academy-session')) {
+      return;
+    }
+
+    try {
+      const headers: Record<string, string> = {
+        Accept: 'application/json',
+        Referer: `${API_BASE_URL}/`,
+        Origin: API_BASE_URL,
+      };
+
+      const existingCookies = this.getCookieHeader();
+      if (existingCookies) {
+        headers.Cookie = existingCookies;
+      }
+
+      const res = await fetch(`${API_BASE_URL}/sanctum/csrf-cookie`, {
+        method: 'GET',
+        headers,
+      });
+
+      this.parseAndStoreCookies(res);
+      this.csrfInitialized = true;
+    } catch (e) {
+      console.warn('Failed to fetch CSRF cookie:', e);
     }
   }
 
@@ -44,17 +153,28 @@ class LmsApiClient {
 
   private async request<T>(
     endpoint: string,
-    options: RequestInit = {}
+    options: RequestInit & { _isRetry?: boolean } = {}
   ): Promise<{ data?: T; error?: string; status: number; errors?: Record<string, string[]> }> {
     const url = `${API_BASE_URL}${endpoint}`;
     const headers: Record<string, string> = {
       Accept: 'application/json',
       'Content-Type': 'application/json',
+      Referer: `${API_BASE_URL}/`,
+      Origin: API_BASE_URL,
       ...(options.headers as Record<string, string>),
     };
 
     if (this.token) {
       headers.Authorization = `Bearer ${this.token}`;
+    }
+
+    const cookieHeader = this.getCookieHeader();
+    if (cookieHeader) {
+      headers.Cookie = cookieHeader;
+    }
+
+    if (this.xsrfToken) {
+      headers['X-XSRF-TOKEN'] = this.xsrfToken;
     }
 
     try {
@@ -63,6 +183,9 @@ class LmsApiClient {
         headers,
       });
 
+      // Capture any new cookies from server (e.g. login sets session cookie)
+      this.parseAndStoreCookies(response);
+
       const status = response.status;
       const text = await response.text();
       let json: any = null;
@@ -70,6 +193,12 @@ class LmsApiClient {
         json = text ? JSON.parse(text) : {};
       } catch {
         json = { raw: text };
+      }
+
+      // If session expired or CSRF mismatch (419), refresh CSRF and retry once
+      if (status === 419 && !options._isRetry) {
+        await this.ensureCsrf(true);
+        return this.request(endpoint, { ...options, _isRetry: true });
       }
 
       if (!response.ok) {
@@ -123,6 +252,9 @@ class LmsApiClient {
     cf_turnstile_response?: string | null;
     remember?: boolean;
   }) {
+    // Ensure active Sanctum session and CSRF cookie before posting
+    await this.ensureCsrf();
+
     const deviceId = await getDeviceId();
     const deviceName = getDeviceName();
 
@@ -152,6 +284,7 @@ class LmsApiClient {
    * Completes 2FA login with 6-digit TOTP code or backup recovery code.
    */
   async completeLoginChallenge(challenge_token: string, code: string) {
+    await this.ensureCsrf();
     const res = await this.request<Customer>('/api/v1/auth/login/challenge', {
       method: 'POST',
       body: JSON.stringify({ challenge_token, code }),
@@ -167,6 +300,7 @@ class LmsApiClient {
    * Registers a new customer account and sends email verification.
    */
   async register(payload: RegisterPayload) {
+    await this.ensureCsrf();
     return this.request<{ message: string }>('/api/v1/auth/register', {
       method: 'POST',
       body: JSON.stringify(payload),
@@ -178,6 +312,7 @@ class LmsApiClient {
    * Authenticates native app with Google OAuth access token.
    */
   async googleSignIn(accessToken: string, remember: boolean = true) {
+    await this.ensureCsrf();
     const deviceId = await getDeviceId();
     const deviceName = getDeviceName();
 
@@ -208,6 +343,10 @@ class LmsApiClient {
       await this.request('/api/v1/auth/logout', { method: 'POST' });
     } finally {
       await this.setToken(null);
+      this.cookies.clear();
+      this.xsrfToken = null;
+      this.csrfInitialized = false;
+      await AsyncStorage.multiRemove([TOKEN_KEY, COOKIES_KEY, XSRF_KEY]);
     }
   }
 
@@ -216,6 +355,7 @@ class LmsApiClient {
    * Sends password reset link to user's registered email.
    */
   async forgotPassword(email: string) {
+    await this.ensureCsrf();
     return this.request<{ message: string }>('/api/v1/auth/forgot-password', {
       method: 'POST',
       body: JSON.stringify({ email }),
@@ -232,6 +372,7 @@ class LmsApiClient {
     password: string;
     password_confirmation: string;
   }) {
+    await this.ensureCsrf();
     return this.request<{ message: string }>('/api/v1/auth/reset-password', {
       method: 'POST',
       body: JSON.stringify(payload),

@@ -58,6 +58,7 @@ export const LoginScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   useEffect(() => {
     void (async () => {
       try {
+        await lmsApi.ensureCsrf();
         const meta = await lmsApi.getAuthMeta();
         setCaptchaRequired(meta.captcha_required);
       } catch {
