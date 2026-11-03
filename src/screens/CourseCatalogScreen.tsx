@@ -13,7 +13,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Colors, elevationStyle } from '../theme/colors';
+import { Colors, cardShadow } from '../theme/colors';
 import { lmsApi, API_BASE_URL } from '../api/lmsApi';
 import { CourseCatalogItem } from '../api/types';
 
@@ -60,7 +60,7 @@ export const CourseCatalogScreen: React.FC<{ navigation: any }> = ({ navigation 
     return (
       <TouchableOpacity
         activeOpacity={0.88}
-        style={[styles.courseCard, elevationStyle(3)]}
+        style={[styles.courseCard, cardShadow(2)]}
         onPress={() => navigation.navigate('CourseDetail', { course: item })}
       >
         <Image
@@ -88,17 +88,24 @@ export const CourseCatalogScreen: React.FC<{ navigation: any }> = ({ navigation 
 
           <View style={styles.cardFooter}>
             <View style={styles.metaItem}>
-              <Ionicons name="time-outline" size={15} color={Colors.cyan} />
-              <Text style={styles.metaText}>{durationHours > 0 ? `${durationHours}h` : `${item.duration_minutes}m`}</Text>
+              <Ionicons name="time-outline" size={15} color={Colors.signal} />
+              <Text style={styles.metaText}>
+                {durationHours > 0 ? `${durationHours}h` : `${item.duration_minutes}m`}
+              </Text>
             </View>
 
             <View style={styles.metaItem}>
-              <Ionicons name="play-circle-outline" size={15} color={Colors.primaryLight} />
+              <Ionicons name="play-circle-outline" size={15} color={Colors.signal} />
               <Text style={styles.metaText}>{item.lessons_count} Lessons</Text>
             </View>
 
             <View style={styles.enrollStatus}>
-              <Text style={[styles.statusText, { color: item.is_enrolled ? Colors.emerald : Colors.amber }]}>
+              <Text
+                style={[
+                  styles.statusText,
+                  { color: item.is_enrolled ? Colors.emerald : Colors.signal },
+                ]}
+              >
                 {item.is_enrolled ? 'Enrolled' : 'Available'}
               </Text>
             </View>
@@ -119,13 +126,8 @@ export const CourseCatalogScreen: React.FC<{ navigation: any }> = ({ navigation 
           },
         ]}
       >
-        <View style={styles.headerTitleRow}>
-          <Text style={styles.screenTitle}>Explore Courses</Text>
-          <View style={styles.liveIndicator}>
-            <View style={styles.liveDot} />
-            <Text style={styles.liveText}>Live Catalog</Text>
-          </View>
-        </View>
+        <Text style={styles.screenTitle}>Explore Courses</Text>
+        <Text style={styles.screenSubtitle}>Practical tracks for career advancement</Text>
 
         {/* Search Bar */}
         <View style={styles.searchContainer}>
@@ -148,7 +150,7 @@ export const CourseCatalogScreen: React.FC<{ navigation: any }> = ({ navigation 
       {/* Main List */}
       {loading ? (
         <View style={styles.centerContainer}>
-          <ActivityIndicator size="large" color={Colors.primary} />
+          <ActivityIndicator size="large" color={Colors.signal} />
           <Text style={styles.loadingText}>Loading course catalog...</Text>
         </View>
       ) : (
@@ -164,14 +166,15 @@ export const CourseCatalogScreen: React.FC<{ navigation: any }> = ({ navigation 
             <RefreshControl
               refreshing={refreshing}
               onRefresh={onRefresh}
-              tintColor={Colors.primaryLight}
-              colors={[Colors.primary]}
+              tintColor={Colors.signal}
+              colors={[Colors.signal]}
             />
           }
           ListEmptyComponent={
             <View style={styles.emptyContainer}>
               <Ionicons name="book-outline" size={48} color={Colors.textMuted} />
-              <Text style={styles.emptyText}>No courses found.</Text>
+              <Text style={styles.emptyTitle}>No Courses Found</Text>
+              <Text style={styles.emptyText}>Try searching with a different term.</Text>
             </View>
           }
         />
@@ -183,62 +186,40 @@ export const CourseCatalogScreen: React.FC<{ navigation: any }> = ({ navigation 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.background,
+    backgroundColor: Colors.canvas,
   },
   header: {
     paddingHorizontal: 20,
     paddingBottom: 14,
-    backgroundColor: Colors.backgroundInput,
+    backgroundColor: Colors.surface,
     borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
-  },
-  headerTitleRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 12,
+    borderBottomColor: Colors.borderSubtle,
   },
   screenTitle: {
-    color: Colors.textPrimary,
+    color: Colors.textMain,
     fontSize: 22,
     fontWeight: '800',
-    letterSpacing: 0.5,
+    letterSpacing: -0.3,
   },
-  liveIndicator: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(16, 185, 129, 0.15)',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: 'rgba(16, 185, 129, 0.3)',
-  },
-  liveDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: Colors.emerald,
-    marginRight: 6,
-  },
-  liveText: {
-    color: Colors.emerald,
-    fontSize: 11,
-    fontWeight: '700',
+  screenSubtitle: {
+    color: Colors.textSecondary,
+    fontSize: 13,
+    marginTop: 2,
+    marginBottom: 12,
   },
   searchContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.06)',
+    backgroundColor: Colors.surfaceElevated,
     borderRadius: 12,
     paddingHorizontal: 12,
     height: 44,
     borderWidth: 1,
-    borderColor: Colors.borderLight,
+    borderColor: Colors.borderSubtle,
   },
   searchInput: {
     flex: 1,
-    color: Colors.textPrimary,
+    color: Colors.textMain,
     fontSize: 14,
   },
   listContent: {
@@ -246,16 +227,16 @@ const styles = StyleSheet.create({
     gap: 16,
   },
   courseCard: {
-    backgroundColor: Colors.backgroundCard,
-    borderRadius: 18,
+    backgroundColor: Colors.surface,
+    borderRadius: 16,
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: Colors.borderSubtle,
   },
   courseImage: {
     width: '100%',
     height: 165,
-    backgroundColor: '#1E293B',
+    backgroundColor: Colors.surfaceElevated,
   },
   cardContent: {
     padding: 16,
@@ -265,20 +246,20 @@ const styles = StyleSheet.create({
   },
   eyebrowBadge: {
     alignSelf: 'flex-start',
-    backgroundColor: Colors.badgeBg,
-    borderColor: Colors.badgeBorder,
+    backgroundColor: '#ECFEFF',
+    borderColor: '#A5F3FC',
     borderWidth: 1,
     paddingHorizontal: 10,
     paddingVertical: 3,
     borderRadius: 8,
   },
   eyebrowText: {
-    color: Colors.primaryLight,
+    color: Colors.signal,
     fontSize: 11,
     fontWeight: '700',
   },
   courseTitle: {
-    color: Colors.textPrimary,
+    color: Colors.textMain,
     fontSize: 17,
     fontWeight: '700',
     marginBottom: 6,
@@ -296,7 +277,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingTop: 12,
     borderTopWidth: 1,
-    borderTopColor: Colors.border,
+    borderTopColor: Colors.borderSubtle,
   },
   metaItem: {
     flexDirection: 'row',
@@ -309,32 +290,40 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   enrollStatus: {
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
-    paddingHorizontal: 10,
-    paddingVertical: 3,
-    borderRadius: 12,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 6,
+    backgroundColor: Colors.surfaceElevated,
   },
   statusText: {
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: '700',
   },
   centerContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    paddingTop: 60,
   },
   loadingText: {
     color: Colors.textSecondary,
-    fontSize: 14,
-    marginTop: 12,
+    fontSize: 13,
+    marginTop: 10,
   },
   emptyContainer: {
     alignItems: 'center',
-    marginTop: 60,
+    justifyContent: 'center',
+    paddingTop: 60,
+  },
+  emptyTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: Colors.textMain,
+    marginTop: 12,
   },
   emptyText: {
-    color: Colors.textMuted,
-    fontSize: 14,
-    marginTop: 10,
+    color: Colors.textSecondary,
+    fontSize: 13,
+    marginTop: 4,
   },
 });

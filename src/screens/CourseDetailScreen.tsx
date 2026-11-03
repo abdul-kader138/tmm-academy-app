@@ -12,7 +12,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Colors, elevationStyle } from '../theme/colors';
+import { Colors, cardShadow } from '../theme/colors';
 import { lmsApi, API_BASE_URL } from '../api/lmsApi';
 import { CourseCatalogItem, CourseDetail } from '../api/types';
 
@@ -54,7 +54,7 @@ export const CourseDetailScreen: React.FC<{ route: any; navigation: any }> = ({
         <View style={styles.coverWrapper}>
           <Image source={{ uri: imageUrl }} style={styles.coverImage} resizeMode="cover" />
           <LinearGradient
-            colors={['rgba(11, 15, 25, 0.4)', 'rgba(11, 15, 25, 0.95)']}
+            colors={['rgba(15, 23, 42, 0.25)', 'rgba(15, 23, 42, 0.85)']}
             style={StyleSheet.absoluteFill}
           />
 
@@ -67,10 +67,6 @@ export const CourseDetailScreen: React.FC<{ route: any; navigation: any }> = ({
             >
               <Ionicons name="arrow-back" size={22} color="#FFFFFF" />
             </TouchableOpacity>
-
-            <View style={styles.shareBadge}>
-              <Ionicons name="bookmark-outline" size={20} color="#FFFFFF" />
-            </View>
           </View>
 
           {/* Title on cover */}
@@ -87,21 +83,23 @@ export const CourseDetailScreen: React.FC<{ route: any; navigation: any }> = ({
         {/* Content Body */}
         <View style={styles.body}>
           {/* Stats Bar */}
-          <View style={[styles.statsBar, elevationStyle(2)]}>
+          <View style={[styles.statsBar, cardShadow(2)]}>
             <View style={styles.statCol}>
-              <Ionicons name="time" size={18} color={Colors.cyan} />
-              <Text style={styles.statVal}>{Math.round(course.duration_minutes / 60)} Hours</Text>
+              <Ionicons name="time-outline" size={18} color={Colors.signal} />
+              <Text style={styles.statVal}>
+                {Math.round(course.duration_minutes / 60)} Hours
+              </Text>
               <Text style={styles.statLbl}>Duration</Text>
             </View>
             <View style={styles.vDivider} />
             <View style={styles.statCol}>
-              <Ionicons name="layers" size={18} color={Colors.primaryLight} />
+              <Ionicons name="layers-outline" size={18} color={Colors.signal} />
               <Text style={styles.statVal}>{course.lessons_count} Lessons</Text>
               <Text style={styles.statLbl}>Curriculum</Text>
             </View>
             <View style={styles.vDivider} />
             <View style={styles.statCol}>
-              <Ionicons name="ribbon" size={18} color={Colors.emerald} />
+              <Ionicons name="ribbon-outline" size={18} color={Colors.emerald} />
               <Text style={styles.statVal}>Certificate</Text>
               <Text style={styles.statLbl}>Included</Text>
             </View>
@@ -111,21 +109,21 @@ export const CourseDetailScreen: React.FC<{ route: any; navigation: any }> = ({
           <Text style={styles.sectionHeading}>About this Course</Text>
           <Text style={styles.descriptionText}>{course.description}</Text>
 
-          {/* Syllabus / Sections if present */}
+          {/* Syllabus / Sections */}
           {loading ? (
-            <ActivityIndicator color={Colors.primary} style={{ marginTop: 20 }} />
+            <ActivityIndicator color={Colors.signal} style={{ marginTop: 20 }} />
           ) : detail?.sections && detail.sections.length > 0 ? (
             <View style={{ marginTop: 24 }}>
               <Text style={styles.sectionHeading}>Course Syllabus</Text>
               {detail.sections.map((sec, idx) => (
-                <View key={sec.id || idx} style={styles.sectionCard}>
+                <View key={sec.id || idx} style={[styles.sectionCard, cardShadow(1)]}>
                   <Text style={styles.sectionTitle}>{sec.title}</Text>
                   {sec.lessons.map((les) => (
                     <View key={les.id} style={styles.lessonRow}>
                       <Ionicons
-                        name={les.is_completed ? 'checkmark-circle' : 'play-circle'}
+                        name={les.is_completed ? 'checkmark-circle' : 'play-circle-outline'}
                         size={18}
-                        color={les.is_completed ? Colors.emerald : Colors.primaryLight}
+                        color={les.is_completed ? Colors.emerald : Colors.signal}
                       />
                       <Text style={styles.lessonTitle}>{les.title}</Text>
                       <Text style={styles.lessonTime}>
@@ -144,33 +142,34 @@ export const CourseDetailScreen: React.FC<{ route: any; navigation: any }> = ({
       <View
         style={[
           styles.bottomBar,
-          elevationStyle(4),
+          cardShadow(4),
           {
             paddingBottom: insets.bottom > 0 ? insets.bottom + 8 : 16,
           },
         ]}
       >
-        <View style={styles.priceCol}>
-          <Text style={styles.statusLabel}>Enrolled Status</Text>
+        <View style={styles.statusCol}>
+          <Text style={styles.statusLabel}>Enrollment</Text>
           <Text style={styles.statusValue}>
-            {course.is_enrolled ? 'Already Enrolled' : 'Ready to Start'}
+            {course.is_enrolled ? 'Active Student' : 'Open for Enrollment'}
           </Text>
         </View>
 
         <TouchableOpacity
-          style={styles.enrollBtn}
+          style={styles.actionBtn}
           activeOpacity={0.85}
           onPress={() => {
             if (course.is_enrolled) {
-              navigation.navigate('Dashboard');
+              navigation.navigate('MainTabs', { screen: 'DashboardTab' });
             } else {
               navigation.navigate('Login');
             }
           }}
         >
-          <Text style={styles.enrollBtnText}>
-            {course.is_enrolled ? 'Go to Learning' : 'Enroll / Sign In'}
+          <Text style={styles.actionBtnText}>
+            {course.is_enrolled ? 'Go to Classroom' : 'Enroll / Sign In'}
           </Text>
+          <Ionicons name="arrow-forward" size={16} color="#FFFFFF" />
         </TouchableOpacity>
       </View>
     </View>
@@ -180,7 +179,7 @@ export const CourseDetailScreen: React.FC<{ route: any; navigation: any }> = ({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.background,
+    backgroundColor: Colors.canvas,
   },
   coverWrapper: {
     width: '100%',
@@ -192,6 +191,7 @@ const styles = StyleSheet.create({
     width: '100%',
     height: '100%',
     position: 'absolute',
+    backgroundColor: Colors.surfaceElevated,
   },
   topBar: {
     position: 'absolute',
@@ -205,15 +205,7 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: 'rgba(15, 23, 42, 0.7)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  shareBadge: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(15, 23, 42, 0.7)',
+    backgroundColor: 'rgba(15, 23, 42, 0.75)',
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -222,16 +214,14 @@ const styles = StyleSheet.create({
   },
   badge: {
     alignSelf: 'flex-start',
-    backgroundColor: Colors.badgeBg,
-    borderColor: Colors.badgeBorder,
-    borderWidth: 1,
+    backgroundColor: 'rgba(236, 254, 255, 0.95)',
     paddingHorizontal: 10,
     paddingVertical: 3,
     borderRadius: 6,
     marginBottom: 8,
   },
   badgeText: {
-    color: Colors.primaryLight,
+    color: Colors.signal,
     fontSize: 11,
     fontWeight: '700',
   },
@@ -248,12 +238,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: Colors.backgroundCard,
+    backgroundColor: Colors.surface,
     borderRadius: 16,
     paddingVertical: 14,
     paddingHorizontal: 16,
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: Colors.borderSubtle,
     marginBottom: 24,
   },
   statCol: {
@@ -261,23 +251,23 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   statVal: {
-    color: Colors.textPrimary,
+    color: Colors.textMain,
     fontSize: 13,
     fontWeight: '700',
     marginTop: 4,
   },
   statLbl: {
-    color: Colors.textMuted,
-    fontSize: 10,
+    color: Colors.textSecondary,
+    fontSize: 11,
     marginTop: 2,
   },
   vDivider: {
     width: 1,
     height: 30,
-    backgroundColor: Colors.borderLight,
+    backgroundColor: Colors.borderSubtle,
   },
   sectionHeading: {
-    color: Colors.textPrimary,
+    color: Colors.textMain,
     fontSize: 17,
     fontWeight: '700',
     marginBottom: 10,
@@ -288,15 +278,15 @@ const styles = StyleSheet.create({
     lineHeight: 22,
   },
   sectionCard: {
-    backgroundColor: Colors.backgroundCard,
+    backgroundColor: Colors.surface,
     borderRadius: 14,
     padding: 16,
     marginBottom: 12,
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: Colors.borderSubtle,
   },
   sectionTitle: {
-    color: Colors.textPrimary,
+    color: Colors.textMain,
     fontSize: 15,
     fontWeight: '700',
     marginBottom: 12,
@@ -304,9 +294,9 @@ const styles = StyleSheet.create({
   lessonRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 8,
+    paddingVertical: 9,
     borderTopWidth: 1,
-    borderTopColor: Colors.border,
+    borderTopColor: Colors.borderSubtle,
     gap: 10,
   },
   lessonTitle: {
@@ -323,34 +313,38 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 0,
     right: 0,
-    backgroundColor: Colors.backgroundInput,
+    backgroundColor: Colors.surface,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 20,
     paddingTop: 12,
     borderTopWidth: 1,
-    borderTopColor: Colors.border,
+    borderTopColor: Colors.borderSubtle,
   },
-  priceCol: {
+  statusCol: {
     flex: 1,
   },
   statusLabel: {
-    color: Colors.textMuted,
+    color: Colors.textSecondary,
     fontSize: 11,
+    fontWeight: '600',
   },
   statusValue: {
-    color: Colors.emerald,
-    fontSize: 15,
+    color: Colors.textMain,
+    fontSize: 14,
     fontWeight: '700',
   },
-  enrollBtn: {
-    backgroundColor: Colors.primary,
+  actionBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: Colors.signal,
     paddingVertical: 12,
-    paddingHorizontal: 22,
+    paddingHorizontal: 20,
     borderRadius: 12,
   },
-  enrollBtnText: {
+  actionBtnText: {
     color: '#FFFFFF',
     fontSize: 14,
     fontWeight: '700',

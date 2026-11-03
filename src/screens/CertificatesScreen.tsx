@@ -7,57 +7,67 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   Platform,
+  Linking,
   Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Colors, elevationStyle } from '../theme/colors';
+import { Colors, cardShadow } from '../theme/colors';
 import { lmsApi } from '../api/lmsApi';
 import { CertificateItem } from '../api/types';
 
-export const CertificatesScreen: React.FC = () => {
+export const CertificatesScreen: React.FC<{ navigation?: any }> = ({ navigation }) => {
   const insets = useSafeAreaInsets();
   const [certificates, setCertificates] = useState<CertificateItem[]>([]);
   const [loading, setLoading] = useState(true);
 
+  const fetchCertificates = async () => {
+    try {
+      const certs = await lmsApi.getCertificates();
+      setCertificates(certs);
+    } catch {
+      setCertificates([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
-    void (async () => {
-      try {
-        const certs = await lmsApi.getCertificates();
-        setCertificates(certs);
-      } catch {
-        setCertificates([]);
-      } finally {
-        setLoading(false);
-      }
-    })();
+    void fetchCertificates();
   }, []);
 
-  const handleDownload = (cert: CertificateItem) => {
-    Alert.alert(
-      'Download Certificate',
-      `Downloading PDF for ${cert.course_title || 'Certificate'}...`
-    );
+  const handleDownload = async (cert: CertificateItem) => {
+    const downloadUrl = lmsApi.getCertificateDownloadUrl(cert.id);
+    try {
+      const supported = await Linking.canOpenURL(downloadUrl);
+      if (supported) {
+        await Linking.openURL(downloadUrl);
+      } else {
+        Alert.alert('Download Link', downloadUrl);
+      }
+    } catch {
+      Alert.alert('Download Error', 'Could not open certificate download link.');
+    }
   };
 
   const renderCertItem = ({ item }: { item: CertificateItem }) => (
-    <View style={[styles.certCard, elevationStyle(3)]}>
+    <View style={[styles.certCard, cardShadow(2)]}>
       <View style={styles.ribbonBadge}>
-        <Ionicons name="ribbon" size={28} color={Colors.emerald} />
+        <Ionicons name="ribbon" size={26} color={Colors.emerald} />
       </View>
 
       <View style={styles.certBody}>
-        <Text style={styles.courseTitle}>{item.course_title || 'Professional Certification'}</Text>
-        <Text style={styles.certNumber}>ID: {item.certificate_number || 'TMM-CERT-2026-001'}</Text>
-        <Text style={styles.issuedDate}>Issued: {item.issued_at || 'Completed Course'}</Text>
+        <Text style={styles.courseTitle}>{item.course_title || 'Course Certificate'}</Text>
+        <Text style={styles.certNumber}>ID: {item.certificate_number}</Text>
+        <Text style={styles.issuedDate}>Issued: {item.issued_at}</Text>
       </View>
 
       <TouchableOpacity
         style={styles.downloadBtn}
         onPress={() => handleDownload(item)}
-        activeOpacity={0.75}
+        activeOpacity={0.8}
       >
-        <Ionicons name="download-outline" size={18} color="#FFFFFF" />
+        <Ionicons name="download-outline" size={16} color="#FFFFFF" />
         <Text style={styles.downloadText}>PDF</Text>
       </TouchableOpacity>
     </View>
@@ -79,29 +89,39 @@ export const CertificatesScreen: React.FC = () => {
 
       {loading ? (
         <View style={styles.centerContainer}>
-          <ActivityIndicator size="large" color={Colors.primary} />
+          <ActivityIndicator size="large" color={Colors.signal} />
+          <Text style={styles.loadingText}>Fetching certificates...</Text>
         </View>
       ) : (
         <FlatList
-          data={
-            certificates.length > 0
-              ? certificates
-              : [
-                  {
-                    id: 1,
-                    course_id: 3,
-                    course_title: 'BOC-12 (বিজনেস অপরচুনিটি কোর্স)',
-                    certificate_number: 'TMM-2026-BOC12-892',
-                    issued_at: '2026-11-01',
-                  },
-                ]
-          }
+          data={certificates}
           keyExtractor={(item) => item.id.toString()}
           renderItem={renderCertItem}
           contentContainerStyle={[
             styles.listContent,
             { paddingBottom: insets.bottom + 80 },
           ]}
+          ListEmptyComponent={
+            <View style={[styles.emptyCard, cardShadow(1)]}>
+              <View style={styles.emptyIconCircle}>
+                <Ionicons name="ribbon-outline" size={40} color={Colors.textMuted} />
+              </View>
+              <Text style={styles.emptyTitle}>No Certificates Yet</Text>
+              <Text style={styles.emptyDesc}>
+                Complete all course curriculum lessons and exercises to earn your verified certificates.
+              </Text>
+              {navigation && (
+                <TouchableOpacity
+                  style={styles.browseBtn}
+                  onPress={() => navigation.navigate('CatalogTab')}
+                  activeOpacity={0.85}
+                >
+                  <Text style={styles.browseBtnText}>Explore Courses</Text>
+                  <Ionicons name="arrow-forward" size={16} color="#FFFFFF" />
+                </TouchableOpacity>
+              )}
+            </View>
+          }
         />
       )}
     </View>
@@ -111,24 +131,34 @@ export const CertificatesScreen: React.FC = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.background,
+    backgroundColor: Colors.canvas,
   },
   header: {
     paddingHorizontal: 20,
     paddingBottom: 14,
-    backgroundColor: Colors.backgroundInput,
+    backgroundColor: Colors.surface,
     borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
+    borderBottomColor: Colors.borderSubtle,
   },
   screenTitle: {
-    color: Colors.textPrimary,
+    color: Colors.textMain,
     fontSize: 22,
     fontWeight: '800',
   },
   screenSub: {
-    color: Colors.textMuted,
-    fontSize: 12,
+    color: Colors.textSecondary,
+    fontSize: 13,
     marginTop: 2,
+  },
+  centerContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    color: Colors.textSecondary,
+    fontSize: 13,
+    marginTop: 10,
   },
   listContent: {
     padding: 16,
@@ -137,17 +167,17 @@ const styles = StyleSheet.create({
   certCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: Colors.backgroundCard,
+    backgroundColor: Colors.surface,
     borderRadius: 16,
     padding: 16,
     borderWidth: 1,
-    borderColor: 'rgba(16, 185, 129, 0.25)',
+    borderColor: Colors.borderSubtle,
   },
   ribbonBadge: {
     width: 46,
     height: 46,
     borderRadius: 23,
-    backgroundColor: 'rgba(16, 185, 129, 0.15)',
+    backgroundColor: '#ECFDF5',
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 14,
@@ -156,15 +186,14 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   courseTitle: {
-    color: Colors.textPrimary,
-    fontSize: 14,
+    color: Colors.textMain,
+    fontSize: 15,
     fontWeight: '700',
-    marginBottom: 4,
+    marginBottom: 3,
   },
   certNumber: {
-    color: Colors.cyan,
-    fontSize: 11,
-    fontWeight: '600',
+    color: Colors.textSecondary,
+    fontSize: 12,
     marginBottom: 2,
   },
   issuedDate: {
@@ -174,9 +203,9 @@ const styles = StyleSheet.create({
   downloadBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: Colors.primary,
-    paddingVertical: 8,
+    backgroundColor: Colors.signal,
     paddingHorizontal: 12,
+    paddingVertical: 7,
     borderRadius: 8,
     gap: 4,
   },
@@ -185,9 +214,49 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '700',
   },
-  centerContainer: {
-    flex: 1,
+  emptyCard: {
+    backgroundColor: Colors.surface,
+    borderRadius: 16,
+    padding: 28,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: Colors.borderSubtle,
+    marginTop: 20,
+  },
+  emptyIconCircle: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: Colors.surfaceElevated,
     justifyContent: 'center',
     alignItems: 'center',
+    marginBottom: 12,
+  },
+  emptyTitle: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: Colors.textMain,
+  },
+  emptyDesc: {
+    fontSize: 13,
+    color: Colors.textSecondary,
+    textAlign: 'center',
+    lineHeight: 19,
+    marginTop: 6,
+    marginBottom: 18,
+  },
+  browseBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: Colors.signal,
+    paddingVertical: 10,
+    paddingHorizontal: 18,
+    borderRadius: 10,
+  },
+  browseBtnText: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontWeight: '700',
   },
 });

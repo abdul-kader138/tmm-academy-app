@@ -430,6 +430,10 @@ class LmsApiClient {
     return res.data?.certificates || [];
   }
 
+  getCertificateDownloadUrl(certificateId: number | string): string {
+    return `${API_BASE_URL}/api/v1/certificates/${certificateId}/download`;
+  }
+
   // ==========================================
   // ACCOUNT APIS
   // ==========================================
@@ -439,10 +443,44 @@ class LmsApiClient {
   }
 
   async updateAccount(payload: Partial<Customer>) {
+    await this.ensureCsrf();
     return this.request<Customer>('/api/v1/account', {
       method: 'PUT',
       body: JSON.stringify(payload),
     });
+  }
+
+  async changePassword(payload: {
+    current_password: string;
+    password: string;
+    password_confirmation: string;
+  }) {
+    await this.ensureCsrf();
+    return this.request<{ message: string }>('/api/v1/account/password', {
+      method: 'PUT',
+      body: JSON.stringify(payload),
+    });
+  }
+
+  async exportAccountData(): Promise<{ success: boolean; data?: any; error?: string }> {
+    const res = await this.request('/api/v1/account/export');
+    if (res.error) {
+      return { success: false, error: res.error };
+    }
+    return { success: true, data: res.data };
+  }
+
+  async deleteAccount(password: string): Promise<{ success: boolean; error?: string }> {
+    await this.ensureCsrf();
+    const res = await this.request<{ message: string }>('/api/v1/account', {
+      method: 'DELETE',
+      body: JSON.stringify({ password }),
+    });
+    if (res.error) {
+      return { success: false, error: res.error };
+    }
+    await this.logout();
+    return { success: true };
   }
 }
 
