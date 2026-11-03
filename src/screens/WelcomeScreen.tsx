@@ -31,6 +31,12 @@ export const WelcomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => 
   };
 
   useEffect(() => {
+    if (user) {
+      navigation.reset({ index: 0, routes: [{ name: 'MainTabs' }] });
+    }
+  }, [user]);
+
+  useEffect(() => {
     // Subtle breathing float for the hero illustration
     Animated.loop(
       Animated.sequence([

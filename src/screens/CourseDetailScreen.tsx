@@ -158,7 +158,9 @@ export const CourseDetailScreen: React.FC<{ route: any; navigation: any }> = ({
                       />
                       <Text style={styles.lessonTitle}>{les.title}</Text>
                       <Text style={styles.lessonTime}>
-                        {Math.floor(les.duration_seconds / 60)}m
+                        {(les as any).duration_minutes
+                          ? `${(les as any).duration_minutes}m`
+                          : `${Math.floor((les.duration_seconds || 0) / 60)}m`}
                       </Text>
                     </View>
                   ))}

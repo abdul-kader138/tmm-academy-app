@@ -448,42 +448,65 @@ class LmsApiClient {
     const res = await this.request<any>('/api/v1/courses');
     console.log('[lmsApi] getCourses status:', res.status, 'hasData:', Boolean(res.data));
     if (!res.data) return [];
-    if (Array.isArray(res.data.courses)) return res.data.courses;
-    if (Array.isArray(res.data.data)) return res.data.data;
-    if (Array.isArray(res.data)) return res.data;
-    return [];
+    let list: any[] = [];
+    if (Array.isArray(res.data.courses)) list = res.data.courses;
+    else if (Array.isArray(res.data.data)) list = res.data.data;
+    else if (Array.isArray(res.data)) list = res.data;
+    console.log('[lmsApi] getCourses items:', list.map((c: any) => ({ id: c.id, title: c.title, is_enrolled: c.is_enrolled })));
+    return list;
   }
 
   async getCourseDetail(courseSlug: string): Promise<CourseDetail | null> {
     const res = await this.request<any>(`/api/v1/courses/${courseSlug}`);
     console.log('[lmsApi] getCourseDetail status:', res.status, 'for slug:', courseSlug);
     if (!res.data) return null;
-    const data = res.data.course || res.data.data || res.data;
-    // An active enrollment is required for 200 OK under App\Services\Lms\CourseAccessGuard
-    if (data && typeof data === 'object') {
-      data.is_enrolled = true;
+    const courseObj = res.data.course || res.data.data || res.data;
+    if (courseObj && typeof courseObj === 'object') {
+      courseObj.is_enrolled = Boolean(
+        courseObj.enrollment?.status === 'active' ||
+        courseObj.enrollment ||
+        courseObj.is_enrolled ||
+        true
+      );
     }
-    return data as CourseDetail;
+    return courseObj as CourseDetail;
   }
 
   async getDashboard(): Promise<DashboardSummary | null> {
     const res = await this.request<any>('/api/v1/dashboard');
     console.log('[lmsApi] getDashboard status:', res.status, 'error:', res.error);
-    if (res.data) {
-      console.log('[lmsApi] getDashboard raw payload keys:', Object.keys(res.data));
-    }
     if (!res.data) return null;
 
     const raw = res.data;
     const payload = raw.data || raw.dashboard || raw;
 
-    const enrolled_courses: CourseCatalogItem[] =
-      payload.enrolled_courses ||
-      payload.courses ||
-      payload.enrolledCourses ||
-      (Array.isArray(payload) ? payload : []);
+    // Backend returns: { enrollments: [ { course: { id, title, slug, ... }, progress_percent, lessons_total, ... } ] }
+    let enrolled_courses: CourseCatalogItem[] = [];
 
-    console.log('[lmsApi] getDashboard resolved enrolled_courses length:', enrolled_courses.length);
+    if (Array.isArray(payload.enrollments)) {
+      enrolled_courses = payload.enrollments.map((e: any) => {
+        const c = e.course || {};
+        return {
+          id: c.id,
+          slug: c.slug,
+          title: c.title,
+          description: c.description || '',
+          eyebrow: c.eyebrow,
+          cover_image_url: c.cover_image_url || '',
+          duration_minutes: c.duration_minutes || 0,
+          lessons_count: e.lessons_total || c.lessons_count || 0,
+          is_enrolled: true,
+          progress_percent: typeof e.progress_percent === 'number' ? e.progress_percent : 0,
+          created_at: e.enrolled_at || c.created_at || '',
+        };
+      });
+    } else if (Array.isArray(payload.enrolled_courses)) {
+      enrolled_courses = payload.enrolled_courses;
+    } else if (Array.isArray(payload.courses)) {
+      enrolled_courses = payload.courses;
+    }
+
+    console.log('[lmsApi] getDashboard resolved enrolled_courses count:', enrolled_courses.length);
 
     const certificates: CertificateItem[] =
       payload.certificates ||
@@ -495,16 +518,23 @@ class LmsApiClient {
       payload.checkpoints ||
       [];
 
-    const streak_summary =
-      payload.streak_summary ||
-      payload.streakSummary ||
-      { streak_days: 0, active_dates: [] };
+    const rawStreak = payload.learning_streak || payload.streak_summary || {};
+    const streakDays = typeof rawStreak.streak === 'number'
+      ? rawStreak.streak
+      : (rawStreak.streak_days || 0);
+
+    const activeDates = Array.isArray(rawStreak.days)
+      ? rawStreak.days.filter((d: any) => d.count > 0).map((d: any) => d.date)
+      : (rawStreak.active_dates || []);
 
     return {
       enrolled_courses,
       certificates,
       pending_checkpoints,
-      streak_summary,
+      streak_summary: {
+        streak_days: streakDays,
+        active_dates: activeDates,
+      },
     };
   }
 

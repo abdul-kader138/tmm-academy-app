@@ -66,11 +66,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     void (async () => {
       try {
         await lmsApi.init();
-        if (lmsApi.getToken()) {
+        const token = lmsApi.getToken();
+        console.log('[AuthContext] Full startup token:', token);
+        if (token) {
           const profile = await lmsApi.getAccount();
+          console.log('[AuthContext] Startup profile:', profile ? profile.email : 'NULL');
           setUser(profile);
         }
-      } catch {
+      } catch (e) {
+        console.error('[AuthContext] Startup error:', e);
         setUser(null);
       } finally {
         setLoading(false);
