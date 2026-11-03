@@ -22,6 +22,51 @@ import { getDeviceId, getDeviceName } from '../utils/deviceInfo';
 
 export const API_BASE_URL = 'https://academy.tmminnovation.com';
 
+export function normalizeAvatarUrl(raw: string | null | undefined): string | null {
+  if (!raw || typeof raw !== 'string') return null;
+  const trimmed = raw.trim();
+  if (!trimmed || trimmed === 'null' || trimmed === 'undefined') return null;
+
+  // Local file / content URI from ImagePicker
+  if (trimmed.startsWith('file:') || trimmed.startsWith('content:')) {
+    return trimmed;
+  }
+
+  // Force HTTPS if backend returned http for academy.tmminnovation.com
+  if (trimmed.startsWith('http://academy.tmminnovation.com')) {
+    return trimmed.replace('http://academy.tmminnovation.com', 'https://academy.tmminnovation.com');
+  }
+
+  // If backend returns localhost or 127.0.0.1 or 10.0.2.2
+  const localhostMatch = trimmed.match(/^https?:\/\/(localhost|127\.0\.0\.1|10\.0\.2\.2)(?::\d+)?(\/.*)?$/);
+  if (localhostMatch) {
+    let pathname = localhostMatch[2] || '';
+    if (pathname.startsWith('/avatars/')) {
+      pathname = `/storage${pathname}`;
+    }
+    return `${API_BASE_URL}${pathname}`;
+  }
+
+  // Full HTTPS/HTTP URL
+  if (trimmed.startsWith('https://') || trimmed.startsWith('http://')) {
+    if (trimmed.includes('academy.tmminnovation.com/avatars/')) {
+      return trimmed.replace('academy.tmminnovation.com/avatars/', 'academy.tmminnovation.com/storage/avatars/');
+    }
+    // Android blocks cleartext http://, force https://
+    if (trimmed.startsWith('http://')) {
+      return trimmed.replace('http://', 'https://');
+    }
+    return trimmed;
+  }
+
+  // Relative path like /storage/avatars/abc.jpg or avatars/abc.jpg
+  let cleanPath = trimmed.startsWith('/') ? trimmed : `/${trimmed}`;
+  if (cleanPath.startsWith('/avatars/')) {
+    cleanPath = `/storage${cleanPath}`;
+  }
+  return `${API_BASE_URL}${cleanPath}`;
+}
+
 const TOKEN_KEY = '@tmm_academy_auth_token';
 const COOKIES_KEY = '@tmm_academy_cookies';
 const XSRF_KEY = '@tmm_academy_xsrf';
@@ -445,7 +490,13 @@ class LmsApiClient {
   // ==========================================
   async getAccount(): Promise<Customer | null> {
     const res = await this.request<Customer>('/api/v1/account');
-    return res.data || null;
+    if (res.data) {
+      if (res.data.avatar_url) {
+        res.data.avatar_url = normalizeAvatarUrl(res.data.avatar_url);
+      }
+      return res.data;
+    }
+    return null;
   }
 
   async updateProfile(payload: UpdateProfilePayload) {
@@ -539,6 +590,13 @@ class LmsApiClient {
           data?.message ||
           (response.status === 413 ? 'Image is too large (max 5MB).' : `Upload failed (${response.status})`);
         return { success: false, error: errMsg };
+      }
+
+      if (data) {
+        const rawUrl = data.avatar_url || data.user?.avatar_url || data.customer?.avatar_url;
+        if (rawUrl) {
+          data.avatar_url = normalizeAvatarUrl(rawUrl);
+        }
       }
       return { success: true, data };
     } catch (err: any) {

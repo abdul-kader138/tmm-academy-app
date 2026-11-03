@@ -36,6 +36,7 @@ interface AuthContextType {
   regenerateRecoveryCodes: (password: string) => Promise<{ success: boolean; data?: TwoFactorConfirmResponse; error?: string }>;
   logout: () => Promise<void>;
   refreshUser: () => Promise<void>;
+  updateUser: (patch: Partial<Customer>) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType>({
@@ -54,6 +55,7 @@ const AuthContext = createContext<AuthContextType>({
   regenerateRecoveryCodes: async () => ({ success: false }),
   logout: async () => {},
   refreshUser: async () => {},
+  updateUser: async () => {},
 });
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -194,6 +196,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (profile) setUser(profile);
   };
 
+  const updateUser = async (patch: Partial<Customer>) => {
+    setUser((prev) => {
+      if (!prev) return null;
+      return { ...prev, ...patch };
+    });
+  };
+
   return (
     <AuthContext.Provider
       value={{
@@ -212,6 +221,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         regenerateRecoveryCodes,
         logout,
         refreshUser,
+        updateUser,
       }}
     >
       {children}

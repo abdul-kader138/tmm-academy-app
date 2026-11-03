@@ -17,12 +17,12 @@ import * as ImagePicker from 'expo-image-picker';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, cardShadow } from '../theme/colors';
 import { useAuth } from '../context/AuthContext';
-import { lmsApi } from '../api/lmsApi';
+import { lmsApi, normalizeAvatarUrl } from '../api/lmsApi';
 import { PhoneInputField, PhoneValue } from '../components/PhoneInputField';
 
 export const EditProfileScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   const insets = useSafeAreaInsets();
-  const { user, refreshUser, updateProfile, resendVerification } = useAuth();
+  const { user, refreshUser, updateProfile, resendVerification, updateUser } = useAuth();
 
   const [firstName, setFirstName] = useState(user?.first_name || '');
   const [lastName, setLastName] = useState(user?.last_name || '');
@@ -113,7 +113,9 @@ export const EditProfileScreen: React.FC<{ navigation: any }> = ({ navigation })
                 try {
                   const res = await lmsApi.removeAvatar();
                   if (res.success) {
+                    await updateUser({ avatar_url: null });
                     await refreshUser();
+                    setAvatarLoadFailed(false);
                     Alert.alert('Success', 'Profile photo removed.');
                   } else {
                     Alert.alert('Error', res.error || 'Could not remove photo.');
@@ -131,9 +133,12 @@ export const EditProfileScreen: React.FC<{ navigation: any }> = ({ navigation })
 
   const uploadAvatarFile = async (uri: string) => {
     setAvatarUploading(true);
+    setAvatarLoadFailed(false);
     try {
       const res = await lmsApi.uploadAvatar(uri);
       if (res.success) {
+        const returnedUrl = normalizeAvatarUrl(res.data?.avatar_url) || uri;
+        await updateUser({ avatar_url: returnedUrl });
         await refreshUser();
         setAvatarLoadFailed(false);
         Alert.alert('Success', 'Profile photo updated successfully.');
@@ -264,9 +269,12 @@ export const EditProfileScreen: React.FC<{ navigation: any }> = ({ navigation })
               <View style={styles.avatarMini}>
                 {user?.avatar_url && !avatarLoadFailed ? (
                   <Image
-                    source={{ uri: user.avatar_url }}
+                    source={{ uri: normalizeAvatarUrl(user.avatar_url) || user.avatar_url }}
                     style={styles.avatarImage}
-                    onError={() => setAvatarLoadFailed(true)}
+                    onError={(err) => {
+                      console.warn('Avatar image error in EditProfile:', err.nativeEvent);
+                      setAvatarLoadFailed(true);
+                    }}
                   />
                 ) : (
                   <Text style={styles.avatarMiniText}>{initialLetter}</Text>
