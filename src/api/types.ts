@@ -21,6 +21,39 @@ export interface AuthMeta {
   site_key?: string | null;
 }
 
+export interface LoginPayload {
+  email: string;
+  password: string;
+  cf_turnstile_response?: string | null;
+  remember?: boolean;
+  device_id?: string | null;
+  device_name?: string | null;
+}
+
+export interface TwoFactorChallengeResponse {
+  two_factor_required: boolean;
+  challenge_token: string;
+}
+
+export interface RegisterPayload {
+  first_name: string;
+  last_name: string;
+  email: string;
+  password: string;
+  password_confirmation: string;
+  phone?: string | null;
+  phone_country?: string | null;
+  marketing_opt_in?: boolean | null;
+  cf_turnstile_response?: string | null;
+}
+
+export interface GoogleAuthPayload {
+  access_token: string;
+  remember?: boolean;
+  device_id?: string | null;
+  device_name?: string | null;
+}
+
 export interface CourseCatalogItem {
   id: number;
   slug: string;

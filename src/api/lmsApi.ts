@@ -2,12 +2,17 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   Customer,
   AuthMeta,
+  LoginPayload,
+  TwoFactorChallengeResponse,
+  RegisterPayload,
+  GoogleAuthPayload,
   CourseCatalogItem,
   CourseDetail,
   LessonDetail,
   DashboardSummary,
-  CertificateItem
+  CertificateItem,
 } from './types';
+import { getDeviceId, getDeviceName } from '../utils/deviceInfo';
 
 export const API_BASE_URL = 'https://academy.tmminnovation.com';
 
@@ -40,7 +45,7 @@ class LmsApiClient {
   private async request<T>(
     endpoint: string,
     options: RequestInit = {}
-  ): Promise<{ data?: T; error?: string; status: number }> {
+  ): Promise<{ data?: T; error?: string; status: number; errors?: Record<string, string[]> }> {
     const url = `${API_BASE_URL}${endpoint}`;
     const headers: Record<string, string> = {
       Accept: 'application/json',
@@ -68,46 +73,84 @@ class LmsApiClient {
       }
 
       if (!response.ok) {
-        const errorMsg =
-          json?.message ||
-          (json?.errors && Object.values(json.errors).flat().join(', ')) ||
-          `Request failed with status ${status}`;
-        return { error: errorMsg, status };
+        let errorMsg = json?.message || `Request failed with status ${status}`;
+        if (json?.errors && typeof json.errors === 'object') {
+          const fieldErrors = Object.values(json.errors)
+            .flat()
+            .filter(Boolean)
+            .join('\n• ');
+          if (fieldErrors) {
+            errorMsg = `• ${fieldErrors}`;
+          }
+        }
+        return { error: errorMsg, status, errors: json?.errors };
       }
 
       return { data: json as T, status };
     } catch (err: any) {
-      return { error: err.message || 'Network error occurred', status: 0 };
+      return { error: err.message || 'Network connection failed', status: 0 };
     }
   }
 
-  // --- Auth APIs ---
+  // ==========================================
+  // FULL 10-ENDPOINT AUTH SECTION IMPLEMENTATION
+  // ==========================================
+
+  /**
+   * 1. GET /api/v1/auth/meta
+   * Checks whether Turnstile captcha is enforced & retrieves site key.
+   */
   async getAuthMeta(): Promise<AuthMeta> {
     const res = await this.request<AuthMeta>('/api/v1/auth/meta');
     return res.data || { captcha_required: false, site_key: null };
   }
 
+  /**
+   * 2. GET /api/v1/auth/challenge-view
+   * Returns hosted Turnstile challenge URL for native WebView.
+   */
+  getChallengeViewUrl(): string {
+    return `${API_BASE_URL}/api/v1/auth/challenge-view`;
+  }
+
+  /**
+   * 3. POST /api/v1/auth/login
+   * Authenticates user with email, password, optional captcha token, and auto device locking.
+   */
   async login(payload: {
     email: string;
     password: string;
     cf_turnstile_response?: string | null;
     remember?: boolean;
-    device_id?: string | null;
-    device_name?: string | null;
   }) {
-    const res = await this.request<Customer | { two_factor_required: boolean; challenge_token: string }>(
+    const deviceId = await getDeviceId();
+    const deviceName = getDeviceName();
+
+    const fullPayload: LoginPayload = {
+      ...payload,
+      device_id: deviceId,
+      device_name: deviceName,
+      remember: payload.remember ?? true,
+    };
+
+    const res = await this.request<Customer | TwoFactorChallengeResponse>(
       '/api/v1/auth/login',
       {
         method: 'POST',
-        body: JSON.stringify(payload),
+        body: JSON.stringify(fullPayload),
       }
     );
+
     if (res.data && 'token' in res.data && res.data.token) {
       await this.setToken(res.data.token);
     }
     return res;
   }
 
+  /**
+   * 4. POST /api/v1/auth/login/challenge
+   * Completes 2FA login with 6-digit TOTP code or backup recovery code.
+   */
   async completeLoginChallenge(challenge_token: string, code: string) {
     const res = await this.request<Customer>('/api/v1/auth/login/challenge', {
       method: 'POST',
@@ -119,6 +162,47 @@ class LmsApiClient {
     return res;
   }
 
+  /**
+   * 5. POST /api/v1/auth/register
+   * Registers a new customer account and sends email verification.
+   */
+  async register(payload: RegisterPayload) {
+    return this.request<{ message: string }>('/api/v1/auth/register', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  }
+
+  /**
+   * 6. POST /api/v1/auth/google
+   * Authenticates native app with Google OAuth access token.
+   */
+  async googleSignIn(accessToken: string, remember: boolean = true) {
+    const deviceId = await getDeviceId();
+    const deviceName = getDeviceName();
+
+    const payload: GoogleAuthPayload = {
+      access_token: accessToken,
+      remember,
+      device_id: deviceId,
+      device_name: deviceName,
+    };
+
+    const res = await this.request<Customer>('/api/v1/auth/google', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+
+    if (res.data?.token) {
+      await this.setToken(res.data.token);
+    }
+    return res;
+  }
+
+  /**
+   * 7. POST /api/v1/auth/logout
+   * Ends session, revokes Sanctum bearer token, and clears device lock.
+   */
   async logout() {
     try {
       await this.request('/api/v1/auth/logout', { method: 'POST' });
@@ -127,7 +211,46 @@ class LmsApiClient {
     }
   }
 
-  // --- Learner & Courses APIs ---
+  /**
+   * 8. POST /api/v1/auth/forgot-password
+   * Sends password reset link to user's registered email.
+   */
+  async forgotPassword(email: string) {
+    return this.request<{ message: string }>('/api/v1/auth/forgot-password', {
+      method: 'POST',
+      body: JSON.stringify({ email }),
+    });
+  }
+
+  /**
+   * 9. POST /api/v1/auth/reset-password
+   * Resets forgotten password with token from email.
+   */
+  async resetPassword(payload: {
+    token: string;
+    email: string;
+    password: string;
+    password_confirmation: string;
+  }) {
+    return this.request<{ message: string }>('/api/v1/auth/reset-password', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  }
+
+  /**
+   * 10. POST /api/v1/auth/email/verification-notification
+   * Resends email verification link.
+   */
+  async resendVerificationNotification() {
+    return this.request<{ message: string }>('/api/v1/auth/email/verification-notification', {
+      method: 'POST',
+    });
+  }
+
+  // ==========================================
+  // LEARNER & COURSES APIS
+  // ==========================================
   async getCourses(): Promise<CourseCatalogItem[]> {
     const res = await this.request<{ courses: CourseCatalogItem[] }>('/api/v1/courses');
     return res.data?.courses || [];
@@ -166,7 +289,9 @@ class LmsApiClient {
     return res.data?.certificates || [];
   }
 
-  // --- Account APIs ---
+  // ==========================================
+  // ACCOUNT APIS
+  // ==========================================
   async getAccount(): Promise<Customer | null> {
     const res = await this.request<Customer>('/api/v1/account');
     return res.data || null;

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -9,49 +9,210 @@ import {
   Platform,
   ActivityIndicator,
   Alert,
+  Modal,
+  ScrollView,
+  Image,
 } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
+import { WebView } from 'react-native-webview';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Colors, elevationStyle } from '../theme/colors';
+import { Colors, cardShadow } from '../theme/colors';
 import { useAuth } from '../context/AuthContext';
 import { lmsApi } from '../api/lmsApi';
 
+type AuthMode = 'login' | 'register' | 'forgot_password';
+
 export const LoginScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   const insets = useSafeAreaInsets();
-  const { login } = useAuth();
+  const { login, complete2FA, register, forgotPassword } = useAuth();
+
+  // Mode: Sign In vs Create Account vs Forgot Password
+  const [mode, setMode] = useState<AuthMode>('login');
+
+  // Form Fields
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [passwordConfirmation, setPasswordConfirmation] = useState('');
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
+  const [remember, setRemember] = useState(true);
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+
+  // Captcha & 2FA State
   const [captchaRequired, setCaptchaRequired] = useState(false);
+  const [turnstileVisible, setTurnstileVisible] = useState(false);
+  const [twoFactorVisible, setTwoFactorVisible] = useState(false);
+  const [challengeToken, setChallengeToken] = useState('');
+  const [totpCode, setTotpCode] = useState('');
+
+  // Pending submit action waiting for Turnstile resolution
+  const pendingActionRef = useRef<((token: string) => Promise<void>) | null>(null);
 
   useEffect(() => {
     void (async () => {
-      const meta = await lmsApi.getAuthMeta();
-      setCaptchaRequired(meta.captcha_required);
+      try {
+        const meta = await lmsApi.getAuthMeta();
+        setCaptchaRequired(meta.captcha_required);
+      } catch {
+        setCaptchaRequired(false);
+      }
     })();
   }, []);
 
-  const handleLogin = async () => {
-    if (!email.trim() || !password.trim()) {
-      Alert.alert('Required Fields', 'Please enter your email and password.');
-      return;
+  // Handle Cloudflare Turnstile token from WebView
+  const handleTurnstileMessage = async (event: any) => {
+    try {
+      const data = JSON.parse(event.nativeEvent.data);
+      if (data?.token) {
+        setTurnstileVisible(false);
+        if (pendingActionRef.current) {
+          const action = pendingActionRef.current;
+          pendingActionRef.current = null;
+          // Run the pending submit with the actual turnstile token from Cloudflare
+          await action(data.token);
+        }
+      } else if (data?.error) {
+        Alert.alert('Security Check Failed', 'Please try solving the security check again.');
+        setTurnstileVisible(false);
+        setLoading(false);
+      }
+    } catch {
+      setTurnstileVisible(false);
+      setLoading(false);
     }
+  };
 
+  // Perform Sign In
+  const executeLogin = async (turnstileToken?: string) => {
     setLoading(true);
     try {
       const res = await login({
         email: email.trim(),
         password: password.trim(),
+        cf_turnstile_response: turnstileToken,
+        remember,
       });
 
       if (res.success) {
         navigation.reset({ index: 0, routes: [{ name: 'MainTabs' }] });
-      } else if (res.twoFactor) {
-        Alert.alert('2FA Required', 'Two-Factor challenge verification required.');
+      } else if (res.twoFactor && res.challengeToken) {
+        setChallengeToken(res.challengeToken);
+        setTwoFactorVisible(true);
+      } else if (res.status === 403) {
+        Alert.alert(
+          'Email Verification Required',
+          'Please verify your email address before signing in. Check your inbox for the confirmation link.'
+        );
       } else {
         Alert.alert('Sign In Failed', res.error || 'Please check your credentials.');
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Perform Registration
+  const executeRegister = async (turnstileToken?: string) => {
+    setLoading(true);
+    try {
+      const res = await register({
+        first_name: firstName.trim(),
+        last_name: lastName.trim(),
+        email: email.trim(),
+        password: password.trim(),
+        password_confirmation: passwordConfirmation.trim(),
+        cf_turnstile_response: turnstileToken,
+      });
+
+      if (res.success) {
+        Alert.alert(
+          'Account Created',
+          'We have sent a verification email to ' + email.trim() + '. Please click the link in your email to activate your account, then sign in.',
+          [{ text: 'OK', onPress: () => setMode('login') }]
+        );
+      } else {
+        Alert.alert('Registration Failed', res.error || 'Could not create account.');
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Handle Form Submit
+  const handleSubmit = async () => {
+    if (!email.trim()) {
+      Alert.alert('Required Field', 'Please enter your email address.');
+      return;
+    }
+
+    if (mode === 'forgot_password') {
+      setLoading(true);
+      try {
+        const res = await forgotPassword(email.trim());
+        if (res.success) {
+          Alert.alert('Password Reset', res.message || 'If an account exists, a reset link was sent.', [
+            { text: 'Back to Sign In', onPress: () => setMode('login') },
+          ]);
+        } else {
+          Alert.alert('Error', res.error || 'Could not send reset link.');
+        }
+      } finally {
+        setLoading(false);
+      }
+      return;
+    }
+
+    if (!password.trim()) {
+      Alert.alert('Required Field', 'Please enter your password.');
+      return;
+    }
+
+    if (mode === 'register') {
+      if (!firstName.trim() || !lastName.trim()) {
+        Alert.alert('Required Fields', 'Please enter your first and last name.');
+        return;
+      }
+      if (password !== passwordConfirmation) {
+        Alert.alert('Password Mismatch', 'Password confirmation does not match.');
+        return;
+      }
+    }
+
+    // Check if Cloudflare Turnstile Captcha is required by the API
+    if (captchaRequired) {
+      pendingActionRef.current = async (turnstileToken: string) => {
+        if (mode === 'login') {
+          await executeLogin(turnstileToken);
+        } else if (mode === 'register') {
+          await executeRegister(turnstileToken);
+        }
+      };
+      setTurnstileVisible(true);
+    } else {
+      if (mode === 'login') {
+        await executeLogin();
+      } else if (mode === 'register') {
+        await executeRegister();
+      }
+    }
+  };
+
+  // Handle 2FA Challenge Submit
+  const handle2FASubmit = async () => {
+    if (!totpCode.trim()) {
+      Alert.alert('Code Required', 'Please enter the 6-digit authenticator or recovery code.');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const res = await complete2FA(challengeToken, totpCode.trim());
+      if (res.success) {
+        setTwoFactorVisible(false);
+        navigation.reset({ index: 0, routes: [{ name: 'MainTabs' }] });
+      } else {
+        Alert.alert('Verification Failed', res.error || 'Invalid code.');
       }
     } finally {
       setLoading(false);
@@ -63,43 +224,99 @@ export const LoginScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       style={styles.container}
     >
-      <LinearGradient
-        colors={['#0F172A', '#1E1B4B', '#0F172A']}
-        style={StyleSheet.absoluteFill}
-      />
-
+      {/* Top Navbar */}
       <View
         style={[
-          styles.content,
+          styles.navbar,
           {
-            paddingTop: insets.top + (Platform.OS === 'ios' ? 12 : 20),
-            paddingBottom: insets.bottom + 20,
+            paddingTop: insets.top + (Platform.OS === 'ios' ? 8 : 14),
           },
         ]}
       >
-        {/* Back Button */}
         <TouchableOpacity
-          style={styles.backBtn}
-          onPress={() => navigation.goBack()}
+          style={styles.backButton}
+          onPress={() => {
+            if (mode !== 'login') {
+              setMode('login');
+            } else {
+              navigation.goBack();
+            }
+          }}
           activeOpacity={0.7}
         >
-          <Ionicons name="arrow-back" size={22} color="#FFFFFF" />
+          <Ionicons name="arrow-back" size={22} color={Colors.textMain} />
         </TouchableOpacity>
 
-        {/* Title */}
-        <View style={styles.titleSection}>
-          <Text style={styles.titleText}>Sign In</Text>
-          <Text style={styles.subText}>Access your courses, quizzes, and certificates</Text>
+        <View style={styles.brandRow}>
+          <Image
+            source={require('../../assets/tmm-academy-logo.png')}
+            style={styles.logoImage}
+            resizeMode="contain"
+          />
+          <Text style={styles.brandTitle}>TMM Academy</Text>
         </View>
 
-        {/* Form Card */}
-        <View style={[styles.formCard, elevationStyle(4)]}>
-          {/* Email */}
+        <View style={{ width: 40 }} />
+      </View>
+
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={[
+          styles.scrollBody,
+          { paddingBottom: insets.bottom + 28 },
+        ]}
+      >
+        {/* Title Section */}
+        <View style={styles.headerBlock}>
+          <Text style={styles.headline}>
+            {mode === 'login'
+              ? 'Welcome back'
+              : mode === 'register'
+              ? 'Create your account'
+              : 'Reset your password'}
+          </Text>
+          <Text style={styles.subheadline}>
+            {mode === 'login'
+              ? 'Sign in to access your course syllabus, video lessons, and diplomas.'
+              : mode === 'register'
+              ? 'Register with your name and email to start verified learning tracks.'
+              : 'Enter your registered email and we will send you a secure reset link.'}
+          </Text>
+        </View>
+
+        {/* Form Card with Theme Colors & Shadow */}
+        <View style={[styles.formCard, cardShadow(2)]}>
+          {mode === 'register' && (
+            <View style={styles.nameRow}>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.inputLabel}>First Name</Text>
+                <TextInput
+                  style={styles.inputField}
+                  placeholder="First name"
+                  placeholderTextColor={Colors.textMuted}
+                  value={firstName}
+                  onChangeText={setFirstName}
+                />
+              </View>
+              <View style={{ flex: 1, marginLeft: 10 }}>
+                <Text style={styles.inputLabel}>Last Name</Text>
+                <TextInput
+                  style={styles.inputField}
+                  placeholder="Last name"
+                  placeholderTextColor={Colors.textMuted}
+                  value={lastName}
+                  onChangeText={setLastName}
+                />
+              </View>
+            </View>
+          )}
+
+          {/* Email Address */}
           <Text style={styles.inputLabel}>Email Address</Text>
-          <View style={styles.inputRow}>
-            <Ionicons name="mail-outline" size={18} color={Colors.textSecondary} style={{ marginRight: 10 }} />
+          <View style={styles.inputWrap}>
+            <Ionicons name="mail-outline" size={18} color={Colors.textMuted} style={styles.inputIcon} />
             <TextInput
-              style={styles.inputField}
+              style={styles.inputFieldInner}
               placeholder="name@example.com"
               placeholderTextColor={Colors.textMuted}
               keyboardType="email-address"
@@ -109,57 +326,191 @@ export const LoginScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
             />
           </View>
 
-          {/* Password */}
-          <Text style={[styles.inputLabel, { marginTop: 16 }]}>Password</Text>
-          <View style={styles.inputRow}>
-            <Ionicons name="lock-closed-outline" size={18} color={Colors.textSecondary} style={{ marginRight: 10 }} />
-            <TextInput
-              style={styles.inputField}
-              placeholder="••••••••"
-              placeholderTextColor={Colors.textMuted}
-              secureTextEntry={!showPassword}
-              value={password}
-              onChangeText={setPassword}
-            />
-            <TouchableOpacity onPress={() => setShowPassword(!showPassword)}>
-              <Ionicons
-                name={showPassword ? 'eye-off-outline' : 'eye-outline'}
-                size={18}
-                color={Colors.textSecondary}
-              />
-            </TouchableOpacity>
-          </View>
+          {/* Password (for login and register) */}
+          {mode !== 'forgot_password' && (
+            <>
+              <View style={styles.labelRow}>
+                <Text style={styles.inputLabel}>Password</Text>
+                {mode === 'login' && (
+                  <TouchableOpacity onPress={() => setMode('forgot_password')}>
+                    <Text style={styles.forgotLink}>Forgot password?</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
 
-          {captchaRequired && (
-            <View style={styles.captchaNotice}>
-              <Ionicons name="shield-checkmark" size={14} color={Colors.cyan} />
-              <Text style={styles.captchaNoticeText}>Cloudflare Turnstile Verified Protection</Text>
-            </View>
+              <View style={styles.inputWrap}>
+                <Ionicons name="lock-closed-outline" size={18} color={Colors.textMuted} style={styles.inputIcon} />
+                <TextInput
+                  style={styles.inputFieldInner}
+                  placeholder="••••••••"
+                  placeholderTextColor={Colors.textMuted}
+                  secureTextEntry={!showPassword}
+                  value={password}
+                  onChangeText={setPassword}
+                />
+                <TouchableOpacity onPress={() => setShowPassword(!showPassword)}>
+                  <Ionicons
+                    name={showPassword ? 'eye-off-outline' : 'eye-outline'}
+                    size={18}
+                    color={Colors.textMuted}
+                  />
+                </TouchableOpacity>
+              </View>
+            </>
           )}
 
-          {/* Sign In Button */}
+          {/* Password Confirmation (for register) */}
+          {mode === 'register' && (
+            <>
+              <Text style={[styles.inputLabel, { marginTop: 14 }]}>Confirm Password</Text>
+              <View style={styles.inputWrap}>
+                <Ionicons name="lock-closed-outline" size={18} color={Colors.textMuted} style={styles.inputIcon} />
+                <TextInput
+                  style={styles.inputFieldInner}
+                  placeholder="Repeat your password"
+                  placeholderTextColor={Colors.textMuted}
+                  secureTextEntry={!showPassword}
+                  value={passwordConfirmation}
+                  onChangeText={setPasswordConfirmation}
+                />
+              </View>
+            </>
+          )}
+
+          {/* Remember me toggle for Login */}
+          {mode === 'login' && (
+            <TouchableOpacity
+              style={styles.rememberRow}
+              onPress={() => setRemember(!remember)}
+              activeOpacity={0.7}
+            >
+              <Ionicons
+                name={remember ? 'checkbox' : 'square-outline'}
+                size={20}
+                color={remember ? Colors.signal : Colors.textMuted}
+              />
+              <Text style={styles.rememberText}>Remember me</Text>
+            </TouchableOpacity>
+          )}
+
+          {/* Password complexity helper for Register */}
+          {mode === 'register' && (
+            <Text style={styles.passwordHint}>
+              • At least 8 characters with upper, lowercase, and numbers.
+            </Text>
+          )}
+
+          {/* Primary Action Button */}
           <TouchableOpacity
-            style={[styles.submitBtn, elevationStyle(3)]}
-            onPress={handleLogin}
+            style={[styles.primarySubmitBtn, cardShadow(2)]}
+            onPress={handleSubmit}
             disabled={loading}
             activeOpacity={0.85}
           >
             {loading ? (
               <ActivityIndicator color="#FFFFFF" />
             ) : (
-              <Text style={styles.submitBtnText}>Sign In</Text>
+              <Text style={styles.primarySubmitText}>
+                {mode === 'login'
+                  ? 'Sign In'
+                  : mode === 'register'
+                  ? 'Create Learner Account'
+                  : 'Send Reset Link'}
+              </Text>
             )}
           </TouchableOpacity>
         </View>
 
-        {/* Bottom Switch */}
-        <View style={styles.footerRow}>
-          <Text style={styles.footerText}>Don't have an account? </Text>
-          <TouchableOpacity onPress={() => Alert.alert('Registration', 'Registration form on LMS portal')}>
-            <Text style={styles.footerLink}>Register</Text>
-          </TouchableOpacity>
+        {/* Bottom Mode Switcher */}
+        <View style={styles.bottomSwitchRow}>
+          {mode === 'login' ? (
+            <>
+              <Text style={styles.switchPromptText}>New to TMM Academy? </Text>
+              <TouchableOpacity onPress={() => setMode('register')}>
+                <Text style={styles.switchActionLink}>Create an account</Text>
+              </TouchableOpacity>
+            </>
+          ) : (
+            <>
+              <Text style={styles.switchPromptText}>Already have an account? </Text>
+              <TouchableOpacity onPress={() => setMode('login')}>
+                <Text style={styles.switchActionLink}>Sign In</Text>
+              </TouchableOpacity>
+            </>
+          )}
         </View>
-      </View>
+      </ScrollView>
+
+      {/* Cloudflare Turnstile Challenge Modal (Official Endpoint) */}
+      <Modal visible={turnstileVisible} transparent animationType="slide">
+        <View style={styles.modalBackdrop}>
+          <View style={[styles.modalCard, cardShadow(3)]}>
+            <View style={styles.modalHeader}>
+              <View style={styles.securityTitleRow}>
+                <Ionicons name="shield-checkmark" size={18} color={Colors.signal} />
+                <Text style={styles.modalTitle}>Security Verification</Text>
+              </View>
+              <TouchableOpacity onPress={() => setTurnstileVisible(false)}>
+                <Ionicons name="close" size={22} color={Colors.textMain} />
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.webViewContainer}>
+              <WebView
+                source={{ uri: lmsApi.getChallengeViewUrl() }}
+                onMessage={handleTurnstileMessage}
+                javaScriptEnabled={true}
+                domStorageEnabled={true}
+                style={{ backgroundColor: 'transparent' }}
+              />
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Two-Factor Authentication Modal */}
+      <Modal visible={twoFactorVisible} transparent animationType="slide">
+        <View style={styles.modalBackdrop}>
+          <View style={[styles.modalCard, cardShadow(3)]}>
+            <View style={styles.modalHeader}>
+              <View style={styles.securityTitleRow}>
+                <Ionicons name="key" size={18} color={Colors.signal} />
+                <Text style={styles.modalTitle}>Two-Factor Verification</Text>
+              </View>
+              <TouchableOpacity onPress={() => setTwoFactorVisible(false)}>
+                <Ionicons name="close" size={22} color={Colors.textMain} />
+              </TouchableOpacity>
+            </View>
+
+            <Text style={styles.twoFactorDesc}>
+              Enter the 6-digit verification code from your authenticator app or an unused backup recovery code.
+            </Text>
+
+            <TextInput
+              style={styles.twoFactorInput}
+              placeholder="123456"
+              placeholderTextColor={Colors.textMuted}
+              keyboardType="number-pad"
+              maxLength={12}
+              value={totpCode}
+              onChangeText={setTotpCode}
+              autoFocus
+            />
+
+            <TouchableOpacity
+              style={styles.primarySubmitBtn}
+              onPress={handle2FASubmit}
+              disabled={loading}
+            >
+              {loading ? (
+                <ActivityIndicator color="#FFFFFF" />
+              ) : (
+                <Text style={styles.primarySubmitText}>Verify & Continue</Text>
+              )}
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </KeyboardAvoidingView>
   );
 };
@@ -167,103 +518,220 @@ export const LoginScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.background,
+    backgroundColor: Colors.canvas,
   },
-  content: {
-    flex: 1,
-    paddingHorizontal: 22,
+  navbar: {
+    flexDirection: 'row',
+    alignItems: 'center',
     justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingBottom: 12,
+    backgroundColor: Colors.surface,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.borderSubtle,
   },
-  backBtn: {
+  backButton: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    alignItems: 'center',
     justifyContent: 'center',
+  },
+  brandRow: {
+    flexDirection: 'row',
     alignItems: 'center',
   },
-  titleSection: {
-    marginTop: 20,
-    marginBottom: 24,
+  logoImage: {
+    width: 28,
+    height: 28,
+    marginRight: 8,
   },
-  titleText: {
-    color: Colors.textPrimary,
-    fontSize: 28,
+  brandTitle: {
+    fontSize: 16,
     fontWeight: '800',
-    marginBottom: 6,
+    color: Colors.textMain,
+    letterSpacing: -0.2,
   },
-  subText: {
-    color: Colors.textSecondary,
-    fontSize: 14,
+
+  scrollBody: {
+    paddingHorizontal: 20,
+    paddingTop: 24,
   },
-  formCard: {
-    backgroundColor: Colors.backgroundCard,
-    borderRadius: 20,
-    padding: 22,
-    borderWidth: 1,
-    borderColor: Colors.border,
+  headerBlock: {
+    marginBottom: 20,
   },
-  inputLabel: {
-    color: Colors.textSecondary,
-    fontSize: 13,
-    fontWeight: '600',
+  headline: {
+    fontSize: 26,
+    fontWeight: '800',
+    color: Colors.textMain,
+    letterSpacing: -0.5,
     marginBottom: 8,
   },
-  inputRow: {
+  subheadline: {
+    fontSize: 14,
+    lineHeight: 21,
+    color: Colors.textSecondary,
+  },
+
+  formCard: {
+    backgroundColor: Colors.surface,
+    borderRadius: 16,
+    padding: 20,
+    borderWidth: 1,
+    borderColor: Colors.borderSubtle,
+    marginBottom: 22,
+  },
+  nameRow: {
+    flexDirection: 'row',
+    marginBottom: 14,
+  },
+  inputLabel: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: Colors.textMain,
+    marginBottom: 6,
+  },
+  labelRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: 14,
+    marginBottom: 6,
+  },
+  forgotLink: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: Colors.signal,
+  },
+  inputWrap: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: Colors.backgroundInput,
-    borderRadius: 12,
-    paddingHorizontal: 14,
-    height: 48,
+    backgroundColor: Colors.surface,
     borderWidth: 1,
-    borderColor: Colors.borderLight,
+    borderColor: Colors.borderSubtle,
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    height: 46,
+  },
+  inputIcon: {
+    marginRight: 8,
   },
   inputField: {
-    flex: 1,
-    color: Colors.textPrimary,
+    backgroundColor: Colors.surface,
+    borderWidth: 1,
+    borderColor: Colors.borderSubtle,
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    height: 46,
     fontSize: 14,
+    color: Colors.textMain,
   },
-  captchaNotice: {
+  inputFieldInner: {
+    flex: 1,
+    height: 44,
+    fontSize: 14,
+    color: Colors.textMain,
+  },
+  rememberRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    backgroundColor: 'rgba(6, 182, 212, 0.1)',
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    borderRadius: 8,
+    gap: 8,
     marginTop: 14,
   },
-  captchaNoticeText: {
-    color: Colors.cyan,
-    fontSize: 11,
+  rememberText: {
+    fontSize: 13,
+    color: Colors.textSecondary,
     fontWeight: '600',
   },
-  submitBtn: {
-    backgroundColor: Colors.primary,
-    borderRadius: 14,
-    height: 48,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginTop: 22,
+  passwordHint: {
+    fontSize: 12,
+    color: Colors.textSecondary,
+    lineHeight: 18,
+    marginTop: 10,
   },
-  submitBtnText: {
+  primarySubmitBtn: {
+    backgroundColor: Colors.signal,
+    borderRadius: 10,
+    height: 46,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 20,
+  },
+  primarySubmitText: {
     color: '#FFFFFF',
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '700',
   },
-  footerRow: {
+
+  bottomSwitchRow: {
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
+    paddingVertical: 10,
   },
-  footerText: {
-    color: Colors.textSecondary,
+  switchPromptText: {
     fontSize: 14,
+    color: Colors.textSecondary,
   },
-  footerLink: {
-    color: Colors.primaryLight,
+  switchActionLink: {
     fontSize: 14,
     fontWeight: '700',
+    color: Colors.signal,
+  },
+
+  /* Modals */
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(15, 23, 42, 0.65)',
+    justifyContent: 'flex-end',
+  },
+  modalCard: {
+    backgroundColor: Colors.surface,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    padding: 20,
+    minHeight: 340,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingBottom: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.borderSubtle,
+  },
+  securityTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  modalTitle: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: Colors.textMain,
+  },
+  webViewContainer: {
+    height: 240,
+    marginTop: 10,
+  },
+  twoFactorDesc: {
+    fontSize: 13,
+    color: Colors.textSecondary,
+    lineHeight: 19,
+    marginTop: 12,
+    marginBottom: 16,
+  },
+  twoFactorInput: {
+    backgroundColor: Colors.surfaceElevated,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: Colors.borderSubtle,
+    height: 50,
+    fontSize: 20,
+    fontWeight: '800',
+    color: Colors.textMain,
+    textAlign: 'center',
+    letterSpacing: 4,
+    marginBottom: 10,
   },
 });
