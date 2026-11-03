@@ -49,6 +49,12 @@ export const LoginScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   // Pending submit action waiting for Turnstile resolution
   const pendingActionRef = useRef<((token: string) => Promise<void>) | null>(null);
 
+  // Sanitize names: strictly blocks numbers and special characters, allowing only letters and spaces
+  const handleNameChange = (text: string, setter: (val: string) => void) => {
+    const sanitized = text.replace(/[^\p{L}\s]/gu, '');
+    setter(sanitized);
+  };
+
   useEffect(() => {
     void (async () => {
       try {
@@ -173,6 +179,11 @@ export const LoginScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
         Alert.alert('Required Fields', 'Please enter your first and last name.');
         return;
       }
+      const namePattern = /^[\p{L}\s]+$/u;
+      if (!namePattern.test(firstName.trim()) || !namePattern.test(lastName.trim())) {
+        Alert.alert('Invalid Name', 'Names can only contain letters and spaces. Numbers and special characters are not allowed.');
+        return;
+      }
       if (password !== passwordConfirmation) {
         Alert.alert('Password Mismatch', 'Password confirmation does not match.');
         return;
@@ -295,7 +306,10 @@ export const LoginScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
                   placeholder="First name"
                   placeholderTextColor={Colors.textMuted}
                   value={firstName}
-                  onChangeText={setFirstName}
+                  onChangeText={(val) => handleNameChange(val, setFirstName)}
+                  keyboardType="default"
+                  autoCapitalize="words"
+                  autoCorrect={false}
                 />
               </View>
               <View style={{ flex: 1, marginLeft: 10 }}>
@@ -305,7 +319,10 @@ export const LoginScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
                   placeholder="Last name"
                   placeholderTextColor={Colors.textMuted}
                   value={lastName}
-                  onChangeText={setLastName}
+                  onChangeText={(val) => handleNameChange(val, setLastName)}
+                  keyboardType="default"
+                  autoCapitalize="words"
+                  autoCorrect={false}
                 />
               </View>
             </View>
