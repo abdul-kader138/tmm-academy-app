@@ -235,6 +235,39 @@ export const CourseDetailScreen: React.FC<{ route: any; navigation: any }> = ({
           ]}
           showsVerticalScrollIndicator={false}
         >
+          {/* Access Expired / Completed Notice */}
+          {course.access_expired && (
+            <View style={[styles.accessExpiredCard, cardShadow(1)]}>
+              <View style={styles.accessExpiredHeader}>
+                <Ionicons name="information-circle" size={20} color="#D97706" />
+                <Text style={styles.accessExpiredTitle}>Enrollment Access Notice</Text>
+              </View>
+              <Text style={styles.accessExpiredMessage}>
+                {course.error_message ||
+                  'Your access to this course has ended. Your earned certificate remains permanently available in the Certificates tab.'}
+              </Text>
+              <View style={styles.accessExpiredButtons}>
+                <TouchableOpacity
+                  style={styles.viewCertBtn}
+                  onPress={() => navigation.navigate('MainTabs', { screen: 'CertificatesTab' })}
+                  activeOpacity={0.8}
+                >
+                  <Ionicons name="ribbon-outline" size={15} color="#FFFFFF" />
+                  <Text style={styles.viewCertBtnText}>View Certificate</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.contactSupportBtn}
+                  onPress={() => navigation.navigate('SupportTicket')}
+                  activeOpacity={0.8}
+                >
+                  <Ionicons name="chatbubbles-outline" size={15} color={Colors.signal} />
+                  <Text style={styles.contactSupportBtnText}>Help Desk</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          )}
+
           <Text style={styles.descriptionText}>{course.description}</Text>
 
           {/* Syllabus / Sections */}
@@ -380,15 +413,25 @@ export const CourseDetailScreen: React.FC<{ route: any; navigation: any }> = ({
       >
         <View style={styles.statusCol}>
           <Text style={styles.statusLabel}>
-            {course.is_enrolled ? 'Student Status' : 'Course Fee'}
+            {course.access_expired ? 'Course Status' : course.is_enrolled ? 'Student Status' : 'Course Fee'}
           </Text>
           <Text
             style={[
               styles.statusValue,
-              { color: course.is_enrolled ? Colors.emerald : priceInfo.isFree ? Colors.emerald : '#0F172A' },
+              {
+                color: course.access_expired
+                  ? '#D97706'
+                  : course.is_enrolled
+                  ? Colors.emerald
+                  : priceInfo.isFree
+                  ? Colors.emerald
+                  : '#0F172A',
+              },
             ]}
           >
-            {course.is_enrolled
+            {course.access_expired
+              ? 'Completed'
+              : course.is_enrolled
               ? 'Enrolled'
               : priceInfo.isFree
               ? 'Free Access'
@@ -399,7 +442,9 @@ export const CourseDetailScreen: React.FC<{ route: any; navigation: any }> = ({
         <TouchableOpacity
           style={[
             styles.actionBtn,
-            course.is_enrolled
+            course.access_expired
+              ? { backgroundColor: '#059669' }
+              : course.is_enrolled
               ? { backgroundColor: Colors.signal }
               : priceInfo.isFree
               ? { backgroundColor: '#059669' }
@@ -408,7 +453,9 @@ export const CourseDetailScreen: React.FC<{ route: any; navigation: any }> = ({
           activeOpacity={0.85}
           disabled={enrolling}
           onPress={() => {
-            if (course.is_enrolled) {
+            if (course.access_expired) {
+              navigation.navigate('MainTabs', { screen: 'CertificatesTab' });
+            } else if (course.is_enrolled) {
               // Find first incomplete lesson, or first lesson
               let targetLessonId: number | string | null = null;
               if (detail?.sections) {
@@ -442,7 +489,9 @@ export const CourseDetailScreen: React.FC<{ route: any; navigation: any }> = ({
           ) : (
             <>
               <Text style={styles.actionBtnText}>
-                {course.is_enrolled
+                {course.access_expired
+                  ? 'View Certificate'
+                  : course.is_enrolled
                   ? 'Go to Classroom'
                   : !user
                   ? 'Sign In to Enroll'
@@ -450,7 +499,11 @@ export const CourseDetailScreen: React.FC<{ route: any; navigation: any }> = ({
                   ? 'Enroll for Free'
                   : `Enroll • ${priceInfo.label}`}
               </Text>
-              <Ionicons name="arrow-forward" size={16} color="#FFFFFF" />
+              <Ionicons
+                name={course.access_expired ? 'ribbon' : 'arrow-forward'}
+                size={16}
+                color="#FFFFFF"
+              />
             </>
           )}
         </TouchableOpacity>
@@ -690,5 +743,66 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '700',
     color: Colors.signal,
+  },
+  accessExpiredCard: {
+    backgroundColor: '#FFFBEB',
+    borderRadius: 14,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#FDE68A',
+    marginBottom: 16,
+  },
+  accessExpiredHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 6,
+  },
+  accessExpiredTitle: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: '#B45309',
+  },
+  accessExpiredMessage: {
+    fontSize: 13,
+    color: '#92400E',
+    lineHeight: 19,
+    marginBottom: 14,
+  },
+  accessExpiredButtons: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    flexWrap: 'wrap',
+  },
+  viewCertBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: '#059669',
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 8,
+  },
+  viewCertBtnText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  contactSupportBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#CBD5E1',
+  },
+  contactSupportBtnText: {
+    color: Colors.signal,
+    fontSize: 12,
+    fontWeight: '700',
   },
 });

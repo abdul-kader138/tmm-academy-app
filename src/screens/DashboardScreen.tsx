@@ -119,7 +119,7 @@ export const DashboardScreen: React.FC<{ navigation: any }> = ({ navigation }) =
 
         <TouchableOpacity
           style={styles.profileBadge}
-          onPress={() => navigation.navigate('AccountTab')}
+          onPress={() => navigation.navigate('MainTabs', { screen: 'AccountTab' })}
           activeOpacity={0.7}
         >
           {user?.avatar_url && !avatarLoadFailed ? (
@@ -236,17 +236,28 @@ export const DashboardScreen: React.FC<{ navigation: any }> = ({ navigation }) =
 
                 <View style={styles.cardActions}>
                   <Text style={styles.lessonInfo}>
-                    {c.lessons_count} Lessons in track
+                    {c.progress_percent === 100
+                      ? 'Course Completed (100%)'
+                      : `${c.lessons_count} Lessons in track`}
                   </Text>
                   <TouchableOpacity
-                    style={styles.continueBtn}
+                    style={[
+                      styles.continueBtn,
+                      c.progress_percent === 100 && { backgroundColor: '#059669' },
+                    ]}
                     onPress={() =>
                       navigation.navigate('CourseDetail', { course: c })
                     }
                     activeOpacity={0.8}
                   >
-                    <Text style={styles.continueBtnText}>Continue</Text>
-                    <Ionicons name="play" size={12} color="#FFFFFF" />
+                    <Text style={styles.continueBtnText}>
+                      {c.progress_percent === 100 ? 'Details' : 'Continue'}
+                    </Text>
+                    <Ionicons
+                      name={c.progress_percent === 100 ? 'ribbon' : 'play'}
+                      size={12}
+                      color="#FFFFFF"
+                    />
                   </TouchableOpacity>
                 </View>
               </View>
@@ -261,7 +272,7 @@ export const DashboardScreen: React.FC<{ navigation: any }> = ({ navigation }) =
             </Text>
             <TouchableOpacity
               style={styles.browseBtn}
-              onPress={() => navigation.navigate('CatalogTab')}
+              onPress={() => navigation.navigate('MainTabs', { screen: 'CatalogTab' })}
               activeOpacity={0.85}
             >
               <Text style={styles.browseBtnText}>Explore Courses</Text>

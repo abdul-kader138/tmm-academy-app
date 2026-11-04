@@ -237,7 +237,7 @@ export const LiveClassesScreen: React.FC<{ navigation: any; route: any }> = ({
             </Text>
             <TouchableOpacity
               style={styles.browseCoursesBtn}
-              onPress={() => navigation.navigate('CatalogTab')}
+              onPress={() => navigation.navigate('MainTabs', { screen: 'CatalogTab' })}
               activeOpacity={0.85}
             >
               <Text style={styles.browseCoursesBtnText}>Explore Available Courses</Text>

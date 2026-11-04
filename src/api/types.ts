@@ -74,6 +74,10 @@ export interface CourseCatalogItem {
   original_price?: number | null;
   checkout_url?: string | null;
   live_sessions?: any[];
+  has_access?: boolean;
+  expires_at?: string;
+  access_expired?: boolean;
+  error_message?: string;
 }
 
 export interface CourseDetail extends CourseCatalogItem {

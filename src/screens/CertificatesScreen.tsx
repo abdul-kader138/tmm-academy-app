@@ -226,7 +226,7 @@ export const CertificatesScreen: React.FC<{ navigation?: any }> = ({ navigation 
               {navigation && (
                 <TouchableOpacity
                   style={styles.browseBtn}
-                  onPress={() => navigation.navigate('CatalogTab')}
+                  onPress={() => navigation.navigate('MainTabs', { screen: 'CatalogTab' })}
                   activeOpacity={0.85}
                 >
                   <Text style={styles.browseBtnText}>Explore Courses</Text>

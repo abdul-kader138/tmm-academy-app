@@ -461,8 +461,33 @@ class LmsApiClient {
 
   async getCourseDetail(courseSlug: string): Promise<CourseDetail | null> {
     const res = await this.request<any>(`/api/v1/courses/${courseSlug}`);
-    console.log('[lmsApi] getCourseDetail status:', res.status, 'for slug:', courseSlug);
-    if (!res.data) return null;
+    console.log('[lmsApi] getCourseDetail status:', res.status, 'for slug:', courseSlug, 'error:', res.error);
+    if (!res.data) {
+      if (res.status === 403) {
+        const catalog = await this.getCourses().catch(() => []);
+        const found = catalog.find((c) => c.slug === courseSlug);
+        return {
+          id: found?.id || 0,
+          slug: courseSlug,
+          title: found?.title || 'Course Details',
+          description: found?.description || '',
+          eyebrow: found?.eyebrow,
+          cover_image_url: found?.cover_image_url || '',
+          duration_minutes: found?.duration_minutes || 0,
+          lessons_count: found?.lessons_count || 0,
+          is_enrolled: false,
+          created_at: found?.created_at || '',
+          is_free: found?.is_free,
+          price_cents: found?.price_cents,
+          checkout_url: found?.checkout_url,
+          sections: [],
+          reviews: [],
+          access_expired: true,
+          error_message: res.error || 'Your access to this course has ended.',
+        } as CourseDetail;
+      }
+      return null;
+    }
     const courseObj = res.data.course || res.data.data || res.data;
     if (courseObj && typeof courseObj === 'object') {
       courseObj.is_enrolled = Boolean(
@@ -483,7 +508,7 @@ class LmsApiClient {
     const raw = res.data;
     const payload = raw.data || raw.dashboard || raw;
 
-    // Backend returns: { enrollments: [ { course: { id, title, slug, ... }, progress_percent, lessons_total, ... } ] }
+    // Backend returns: { enrollments: [ { course: { id, title, slug, ... }, progress_percent, lessons_total, has_access, expires_at } ] }
     let enrolled_courses: CourseCatalogItem[] = [];
 
     if (Array.isArray(payload.enrollments)) {
@@ -501,6 +526,8 @@ class LmsApiClient {
           is_enrolled: true,
           progress_percent: typeof e.progress_percent === 'number' ? e.progress_percent : 0,
           created_at: e.enrolled_at || c.created_at || '',
+          has_access: typeof e.has_access === 'boolean' ? e.has_access : true,
+          expires_at: e.expires_at,
         };
       });
     } else if (Array.isArray(payload.enrolled_courses)) {
