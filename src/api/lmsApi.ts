@@ -585,11 +585,12 @@ class LmsApiClient {
       return { success: false, error: res.error };
     }
     const d = res.data || {};
+    const attempt = d.attempt || d.data || d;
     return {
       success: true,
-      score: d.score,
-      passed: d.passed,
-      message: d.message || 'Quiz submitted successfully',
+      score: typeof attempt.score === 'number' ? attempt.score : d.score,
+      passed: typeof attempt.passed === 'boolean' ? attempt.passed : Boolean(d.passed),
+      message: d.message || attempt.message || 'Quiz submitted successfully',
     };
   }
 

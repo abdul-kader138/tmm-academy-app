@@ -227,10 +227,27 @@ export const QuizScreen: React.FC<{ route: any; navigation: any }> = ({ route, n
             contentContainerStyle={styles.questionContent}
             showsVerticalScrollIndicator={false}
           >
+            {/* Optional Instructions */}
+            {activity?.instructions ? (
+              <View style={styles.instructionsBanner}>
+                <Ionicons name="information-circle-outline" size={18} color={Colors.signal} />
+                <Text style={styles.instructionsText}>{activity.instructions}</Text>
+              </View>
+            ) : null}
+
             {/* Question Text */}
             <View style={[styles.questionCard, cardShadow(1)]}>
-              <Text style={styles.questionNumberText}>Question {currentIndex + 1}</Text>
-              <Text style={styles.questionPrompt}>{currentQuestion.question}</Text>
+              <View style={styles.questionCardHeader}>
+                <Text style={styles.questionNumberText}>Question {currentIndex + 1}</Text>
+                {activity?.passing_score ? (
+                  <Text style={styles.passThresholdBadge}>
+                    Pass: {activity.passing_score}%
+                  </Text>
+                ) : null}
+              </View>
+              <Text style={styles.questionPrompt}>
+                {currentQuestion.prompt || (currentQuestion as any).question || (currentQuestion as any).title || ''}
+              </Text>
             </View>
 
             {/* Options List */}
@@ -238,6 +255,13 @@ export const QuizScreen: React.FC<{ route: any; navigation: any }> = ({ route, n
               {currentQuestion.options.map((option, optIdx) => {
                 const isSelected = selectedAnswers[currentIndex] === optIdx;
                 const letter = String.fromCharCode(65 + optIdx); // A, B, C, D
+                const optionLabel =
+                  typeof option === 'string'
+                    ? option
+                    : (option as any)?.text ||
+                      (option as any)?.label ||
+                      (option as any)?.option ||
+                      String(option);
 
                 return (
                   <TouchableOpacity
@@ -271,7 +295,7 @@ export const QuizScreen: React.FC<{ route: any; navigation: any }> = ({ route, n
                         isSelected && styles.optionTitleSelected,
                       ]}
                     >
-                      {option}
+                      {optionLabel}
                     </Text>
                   </TouchableOpacity>
                 );
@@ -454,12 +478,43 @@ const styles = StyleSheet.create({
     borderColor: Colors.borderSubtle,
     marginBottom: 20,
   },
+  instructionsBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: 'rgba(2, 132, 199, 0.08)',
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 12,
+    marginBottom: 16,
+  },
+  instructionsText: {
+    flex: 1,
+    fontSize: 13,
+    color: Colors.signal,
+    fontWeight: '500',
+    lineHeight: 18,
+  },
+  questionCardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
+  passThresholdBadge: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: Colors.emerald,
+    backgroundColor: 'rgba(16, 185, 129, 0.1)',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+  },
   questionNumberText: {
     fontSize: 12,
     fontWeight: '700',
     color: Colors.signal,
     textTransform: 'uppercase',
-    marginBottom: 8,
   },
   questionPrompt: {
     fontSize: 17,

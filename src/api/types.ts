@@ -135,24 +135,28 @@ export interface ActivitySummary {
 }
 
 export interface QuizQuestion {
-  id?: number;
-  question: string;
-  options: string[];
+  index?: number;
+  prompt?: string;
+  question?: string;
+  options: Array<string | { text?: string; label?: string; option?: string }>;
 }
 
 export interface ActivityDetail {
   id: number;
+  course_id?: number;
   type: 'quiz' | 'exam' | 'test' | 'project';
   title: string;
+  instructions?: string;
   description?: string;
   passing_score?: number;
-  max_attempts?: number;
+  max_attempts?: number | null;
+  attempt_count?: number;
   attempts_count?: number;
+  can_attempt?: boolean;
   questions?: QuizQuestion[];
   is_completed?: boolean;
   score?: number;
   passed?: boolean;
-  can_attempt?: boolean;
 }
 
 export interface CertificateItem {
