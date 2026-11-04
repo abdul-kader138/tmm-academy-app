@@ -21,6 +21,8 @@ import { TwoFactorScreen } from '../screens/TwoFactorScreen';
 import { AccountSecurityScreen } from '../screens/AccountSecurityScreen';
 import { LessonPlayerScreen } from '../screens/LessonPlayerScreen';
 import { QuizScreen } from '../screens/QuizScreen';
+import { SupportTicketScreen } from '../screens/SupportTicketScreen';
+import { LiveClassesScreen } from '../screens/LiveClassesScreen';
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -137,6 +139,8 @@ export const RootNavigator: React.FC = () => {
         <Stack.Screen name="AccountSecurity" component={AccountSecurityScreen} />
         <Stack.Screen name="LessonPlayer" component={LessonPlayerScreen} />
         <Stack.Screen name="Quiz" component={QuizScreen} />
+        <Stack.Screen name="SupportTicket" component={SupportTicketScreen} />
+        <Stack.Screen name="LiveClasses" component={LiveClassesScreen} />
       </Stack.Navigator>
     </NavigationContainer>
   );

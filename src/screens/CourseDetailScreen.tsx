@@ -31,6 +31,8 @@ export const CourseDetailScreen: React.FC<{ route: any; navigation: any }> = ({
   const initialCourse: CourseCatalogItem = route.params?.course;
   const [detail, setDetail] = useState<CourseDetail | null>(null);
   const [loading, setLoading] = useState(true);
+  const [enrolling, setEnrolling] = useState(false);
+  const [joiningSessionId, setJoiningSessionId] = useState<number | string | null>(null);
 
   useEffect(() => {
     void (async () => {
@@ -48,6 +50,84 @@ export const CourseDetailScreen: React.FC<{ route: any; navigation: any }> = ({
       ? course.cover_image_url
       : `${API_BASE_URL}${course.cover_image_url}`
     : '';
+
+  const priceInfo = (() => {
+    if (course.is_free === true) return { isFree: true, label: 'FREE' };
+    if (typeof course.price_cents === 'number') {
+      if (course.price_cents === 0) return { isFree: true, label: 'FREE' };
+      const euros = course.price_cents / 100;
+      return { isFree: false, label: euros % 1 === 0 ? `€${euros}` : `€${euros.toFixed(2)}` };
+    }
+    if (typeof course.price === 'number') {
+      if (course.price === 0) return { isFree: true, label: 'FREE' };
+      return { isFree: false, label: `€${course.price}` };
+    }
+    if (course.price_formatted) return { isFree: false, label: course.price_formatted };
+    return { isFree: true, label: 'FREE' };
+  })();
+
+  const handleEnroll = async () => {
+    if (!user) {
+      navigation.navigate('Login');
+      return;
+    }
+
+    if (priceInfo.isFree) {
+      setEnrolling(true);
+      try {
+        const res = await lmsApi.enrollCourse(course.slug);
+        if (res.success) {
+          Alert.alert('Enrolled Successfully!', `You are now enrolled in "${course.title}". Happy learning!`);
+          const updated = await lmsApi.getCourseDetail(course.slug);
+          if (updated) setDetail(updated);
+        } else {
+          Alert.alert('Notice', res.error || 'Could not enroll in course.');
+        }
+      } catch {
+        Alert.alert('Error', 'An error occurred while enrolling.');
+      } finally {
+        setEnrolling(false);
+      }
+    } else {
+      Alert.alert(
+        'Enroll in Course',
+        `Ready to enroll in "${course.title}" for ${priceInfo.label}?`,
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Proceed to Checkout',
+            onPress: () => {
+              const url = course.checkout_url || `https://academy.tmminnovation.com/courses/${course.slug}`;
+              void Linking.openURL(url);
+            },
+          },
+        ]
+      );
+    }
+  };
+
+  const handleJoinLiveSession = async (sessionId: number | string, defaultJoinUrl?: string) => {
+    setJoiningSessionId(sessionId);
+    try {
+      const res = await lmsApi.joinLiveSession(course.slug, sessionId);
+      const urlToOpen = res.join_url || defaultJoinUrl;
+      if (urlToOpen) {
+        await Linking.openURL(urlToOpen);
+      } else if (res.error) {
+        Alert.alert('Live Session', res.error);
+      } else {
+        Alert.alert('Notice', 'Live session link will be accessible 10 minutes before the scheduled start time.');
+      }
+    } catch {
+      if (defaultJoinUrl) {
+        void Linking.openURL(defaultJoinUrl);
+      } else {
+        Alert.alert('Notice', 'Live session link will open shortly.');
+      }
+    } finally {
+      setJoiningSessionId(null);
+    }
+  };
 
   return (
     <View style={styles.container}>
@@ -106,23 +186,40 @@ export const CourseDetailScreen: React.FC<{ route: any; navigation: any }> = ({
         {/* Stats Bar */}
         <View style={[styles.statsBar, cardShadow(2)]}>
           <View style={styles.statCol}>
-            <Ionicons name="time-outline" size={18} color={Colors.signal} />
+            <Ionicons name="time-outline" size={17} color={Colors.signal} />
             <Text style={styles.statVal}>
-              {Math.round(course.duration_minutes / 60)} Hours
+              {Math.round(course.duration_minutes / 60)}h
             </Text>
             <Text style={styles.statLbl}>Duration</Text>
           </View>
           <View style={styles.vDivider} />
           <View style={styles.statCol}>
-            <Ionicons name="layers-outline" size={18} color={Colors.signal} />
-            <Text style={styles.statVal}>{course.lessons_count} Lessons</Text>
-            <Text style={styles.statLbl}>Curriculum</Text>
+            <Ionicons name="layers-outline" size={17} color={Colors.signal} />
+            <Text style={styles.statVal}>{course.lessons_count}</Text>
+            <Text style={styles.statLbl}>Lessons</Text>
           </View>
           <View style={styles.vDivider} />
           <View style={styles.statCol}>
-            <Ionicons name="ribbon-outline" size={18} color={Colors.emerald} />
-            <Text style={styles.statVal}>Certificate</Text>
-            <Text style={styles.statLbl}>Included</Text>
+            <Ionicons
+              name={priceInfo.isFree ? 'gift-outline' : 'pricetag-outline'}
+              size={17}
+              color={priceInfo.isFree ? Colors.emerald : '#0284C7'}
+            />
+            <Text
+              style={[
+                styles.statVal,
+                { color: priceInfo.isFree ? Colors.emerald : '#0284C7' },
+              ]}
+            >
+              {priceInfo.label}
+            </Text>
+            <Text style={styles.statLbl}>Course Fee</Text>
+          </View>
+          <View style={styles.vDivider} />
+          <View style={styles.statCol}>
+            <Ionicons name="ribbon-outline" size={17} color={Colors.emerald} />
+            <Text style={styles.statVal}>Included</Text>
+            <Text style={styles.statLbl}>Certificate</Text>
           </View>
         </View>
 
@@ -226,6 +323,46 @@ export const CourseDetailScreen: React.FC<{ route: any; navigation: any }> = ({
                   ))}
                 </View>
               ) : null}
+              {/* Live Interactive Sessions if any */}
+              {((detail?.live_sessions && detail.live_sessions.length > 0) ||
+                (course.live_sessions && course.live_sessions.length > 0)) && (
+                <View style={{ marginTop: 18 }}>
+                  <Text style={styles.sectionHeading}>Scheduled Live Sessions</Text>
+                  {(detail?.live_sessions || course.live_sessions || []).map((session: any, sIdx: number) => {
+                    const isJoining = joiningSessionId === session.id;
+                    return (
+                      <View key={session.id || sIdx} style={[styles.activityCard, cardShadow(1)]}>
+                        <View style={[styles.activityIconCircle, { backgroundColor: '#FEF2F2' }]}>
+                          <Ionicons name="videocam" size={20} color="#EF4444" />
+                        </View>
+                        <View style={{ flex: 1 }}>
+                          <Text style={styles.activityTitle}>{session.title || 'Interactive Live Class'}</Text>
+                          <Text style={styles.activitySub}>
+                            {session.start_time || 'Schedule announced in classroom'}
+                            {session.duration_minutes ? ` • ${session.duration_minutes}m` : ''}
+                          </Text>
+                        </View>
+                        {course.is_enrolled ? (
+                          <TouchableOpacity
+                            style={[styles.takeQuizBadge, { backgroundColor: '#EF4444' }]}
+                            onPress={() => void handleJoinLiveSession(session.id, session.join_url)}
+                            disabled={isJoining}
+                          >
+                            {isJoining ? (
+                              <ActivityIndicator size="small" color="#FFFFFF" />
+                            ) : (
+                              <>
+                                <Text style={[styles.takeQuizText, { color: '#FFFFFF' }]}>Join</Text>
+                                <Ionicons name="arrow-forward" size={12} color="#FFFFFF" />
+                              </>
+                            )}
+                          </TouchableOpacity>
+                        ) : null}
+                      </View>
+                    );
+                  })}
+                </View>
+              )}
             </View>
           ) : null}
         </ScrollView>
@@ -242,19 +379,34 @@ export const CourseDetailScreen: React.FC<{ route: any; navigation: any }> = ({
         ]}
       >
         <View style={styles.statusCol}>
-          <Text style={styles.statusLabel}>Enrollment</Text>
-          <Text style={styles.statusValue}>
+          <Text style={styles.statusLabel}>
+            {course.is_enrolled ? 'Student Status' : 'Course Fee'}
+          </Text>
+          <Text
+            style={[
+              styles.statusValue,
+              { color: course.is_enrolled ? Colors.emerald : priceInfo.isFree ? Colors.emerald : '#0F172A' },
+            ]}
+          >
             {course.is_enrolled
-              ? 'Active Student'
-              : user
-              ? 'Available'
-              : 'Open for Enrollment'}
+              ? 'Enrolled'
+              : priceInfo.isFree
+              ? 'Free Access'
+              : priceInfo.label}
           </Text>
         </View>
 
         <TouchableOpacity
-          style={styles.actionBtn}
+          style={[
+            styles.actionBtn,
+            course.is_enrolled
+              ? { backgroundColor: Colors.signal }
+              : priceInfo.isFree
+              ? { backgroundColor: '#059669' }
+              : { backgroundColor: Colors.signal },
+          ]}
           activeOpacity={0.85}
+          disabled={enrolling}
           onPress={() => {
             if (course.is_enrolled) {
               // Find first incomplete lesson, or first lesson
@@ -279,32 +431,28 @@ export const CourseDetailScreen: React.FC<{ route: any; navigation: any }> = ({
                 Alert.alert('Notice', 'No lessons available for this course yet.');
               }
             } else if (user) {
-              Alert.alert(
-                'Enroll in Course',
-                `Ready to enroll in "${course.title}"?`,
-                [
-                  { text: 'Cancel', style: 'cancel' },
-                  {
-                    text: 'Continue to Enroll',
-                    onPress: () => {
-                      void Linking.openURL(`https://academy.tmminnovation.com/courses/${course.slug}`);
-                    },
-                  },
-                ]
-              );
+              void handleEnroll();
             } else {
               navigation.navigate('Login');
             }
           }}
         >
-          <Text style={styles.actionBtnText}>
-            {course.is_enrolled
-              ? 'Go to Classroom'
-              : user
-              ? 'Enroll Now'
-              : 'Enroll / Sign In'}
-          </Text>
-          <Ionicons name="arrow-forward" size={16} color="#FFFFFF" />
+          {enrolling ? (
+            <ActivityIndicator size="small" color="#FFFFFF" />
+          ) : (
+            <>
+              <Text style={styles.actionBtnText}>
+                {course.is_enrolled
+                  ? 'Go to Classroom'
+                  : !user
+                  ? 'Sign In to Enroll'
+                  : priceInfo.isFree
+                  ? 'Enroll for Free'
+                  : `Enroll • ${priceInfo.label}`}
+              </Text>
+              <Ionicons name="arrow-forward" size={16} color="#FFFFFF" />
+            </>
+          )}
         </TouchableOpacity>
       </View>
     </View>

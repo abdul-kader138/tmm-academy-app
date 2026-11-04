@@ -66,11 +66,22 @@ export interface CourseCatalogItem {
   is_enrolled: boolean;
   progress_percent?: number | null;
   created_at: string;
+  is_free?: boolean;
+  price_cents?: number | null;
+  price?: number | null;
+  currency?: string;
+  price_formatted?: string;
+  original_price?: number | null;
+  checkout_url?: string | null;
+  live_sessions?: any[];
 }
 
 export interface CourseDetail extends CourseCatalogItem {
   sections: CourseSection[];
   activities?: ActivitySummary[];
+  attachments?: LessonAttachment[];
+  live_sessions?: any[];
+  live_classes?: LiveClassItem[];
   reviews: CourseReview[];
   instructor?: {
     name: string;
@@ -96,6 +107,16 @@ export interface LessonSummary {
   is_completed: boolean;
   order?: number;
   sort_order?: number;
+  has_attachments?: boolean;
+}
+
+export interface LessonAttachment {
+  id?: number | string;
+  title: string;
+  url?: string;
+  file_url?: string;
+  type?: string;
+  size?: string;
 }
 
 export interface LessonDetail {
@@ -106,6 +127,8 @@ export interface LessonDetail {
   description?: string;
   video_url?: string;
   vimeo_id?: string | number;
+  youtube_id?: string;
+  video_type?: 'vimeo' | 'youtube' | 'direct' | string;
   duration_minutes?: number;
   duration_seconds?: number;
   watched_seconds?: number;
@@ -113,7 +136,48 @@ export interface LessonDetail {
   completed?: boolean;
   prev_lesson_id?: number | null;
   next_lesson_id?: number | null;
+  pdf_url?: string;
+  attachments?: LessonAttachment[];
   comments?: LessonComment[];
+}
+
+export interface LiveClassItem {
+  id: number | string;
+  course_id?: number;
+  course_slug?: string;
+  course_title: string;
+  title: string;
+  description?: string;
+  instructor_name?: string;
+  instructor_avatar?: string;
+  start_time: string;
+  end_time?: string;
+  duration_minutes: number;
+  join_url?: string;
+  platform?: 'zoom' | 'google_meet' | 'teams' | 'live' | string;
+  is_live_now?: boolean;
+  status: 'upcoming' | 'live' | 'completed';
+}
+
+export interface SupportTicket {
+  id: number | string;
+  ticket_number?: string;
+  subject: string;
+  category: string;
+  priority: 'low' | 'normal' | 'high' | 'urgent';
+  status: 'open' | 'pending' | 'resolved' | 'closed';
+  message: string;
+  created_at: string;
+  updated_at?: string;
+  replies?: SupportTicketReply[];
+}
+
+export interface SupportTicketReply {
+  id: number | string;
+  user_name: string;
+  is_staff: boolean;
+  message: string;
+  created_at: string;
 }
 
 export interface LessonComment {

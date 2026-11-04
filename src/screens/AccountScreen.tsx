@@ -328,6 +328,42 @@ export const AccountScreen: React.FC<{ navigation: any }> = ({ navigation }) => 
           <Ionicons name="chevron-forward" size={16} color={Colors.textMuted} />
         </TouchableOpacity>
 
+        {/* Row 1.5: Live Classes & Webinars */}
+        <TouchableOpacity
+          style={styles.menuRow}
+          activeOpacity={0.7}
+          onPress={() => navigation.navigate('LiveClasses')}
+        >
+          <View style={styles.menuRowLeft}>
+            <View style={[styles.menuIconCircle, { backgroundColor: '#FEF2F2' }]}>
+              <Ionicons name="videocam-outline" size={18} color="#EF4444" />
+            </View>
+            <View style={styles.menuTextCol}>
+              <Text style={styles.menuTitle}>Live Classes & Webinars</Text>
+              <Text style={styles.menuSub}>Zoom & Google Meet sessions schedule</Text>
+            </View>
+          </View>
+          <Ionicons name="chevron-forward" size={16} color={Colors.textMuted} />
+        </TouchableOpacity>
+
+        {/* Row 1.8: Support & Help Tickets */}
+        <TouchableOpacity
+          style={styles.menuRow}
+          activeOpacity={0.7}
+          onPress={() => navigation.navigate('SupportTicket')}
+        >
+          <View style={styles.menuRowLeft}>
+            <View style={[styles.menuIconCircle, { backgroundColor: '#ECFEFF' }]}>
+              <Ionicons name="chatbubbles-outline" size={18} color={Colors.signal} />
+            </View>
+            <View style={styles.menuTextCol}>
+              <Text style={styles.menuTitle}>Support Tickets & Help</Text>
+              <Text style={styles.menuSub}>Raise inquiries, ask questions & get assistance</Text>
+            </View>
+          </View>
+          <Ionicons name="chevron-forward" size={16} color={Colors.textMuted} />
+        </TouchableOpacity>
+
         {/* Row 2: Security & 2FA -> Full Screen TwoFactor */}
         <TouchableOpacity
           style={styles.menuRow}

@@ -270,9 +270,60 @@ export const DashboardScreen: React.FC<{ navigation: any }> = ({ navigation }) =
           </View>
         )}
 
+        {/* Live Classes & Support Cards */}
+        <View style={styles.interactiveGrid}>
+          {/* Live Classes Card */}
+          <TouchableOpacity
+            style={[styles.interactiveCard, cardShadow(2)]}
+            onPress={() => navigation.navigate('LiveClasses')}
+            activeOpacity={0.85}
+          >
+            <View style={styles.interactiveCardTop}>
+              <View style={[styles.interactiveIconCircle, { backgroundColor: '#FEF2F2' }]}>
+                <Ionicons name="videocam" size={20} color="#EF4444" />
+              </View>
+              <View style={styles.interactiveBadge}>
+                <Text style={styles.interactiveBadgeText}>LIVE SESSIONS</Text>
+              </View>
+            </View>
+            <Text style={styles.interactiveCardTitle}>Live Classes & Webinars</Text>
+            <Text style={styles.interactiveCardSub}>
+              View interactive Zoom and Google Meet schedules
+            </Text>
+            <View style={styles.interactiveLink}>
+              <Text style={[styles.interactiveLinkText, { color: '#EF4444' }]}>View Schedule</Text>
+              <Ionicons name="arrow-forward" size={12} color="#EF4444" />
+            </View>
+          </TouchableOpacity>
+
+          {/* Support Ticket Card */}
+          <TouchableOpacity
+            style={[styles.interactiveCard, cardShadow(2)]}
+            onPress={() => navigation.navigate('SupportTicket')}
+            activeOpacity={0.85}
+          >
+            <View style={styles.interactiveCardTop}>
+              <View style={[styles.interactiveIconCircle, { backgroundColor: '#ECFEFF' }]}>
+                <Ionicons name="chatbubbles" size={20} color={Colors.signal} />
+              </View>
+              <View style={[styles.interactiveBadge, { backgroundColor: '#ECFEFF' }]}>
+                <Text style={[styles.interactiveBadgeText, { color: Colors.signal }]}>ASSISTANCE</Text>
+              </View>
+            </View>
+            <Text style={styles.interactiveCardTitle}>Support & Help Desk</Text>
+            <Text style={styles.interactiveCardSub}>
+              Raise tickets, get help with quizzes & curriculum
+            </Text>
+            <View style={styles.interactiveLink}>
+              <Text style={styles.interactiveLinkText}>Open Desk</Text>
+              <Ionicons name="arrow-forward" size={12} color={Colors.signal} />
+            </View>
+          </TouchableOpacity>
+        </View>
+
         {/* Pending Checkpoints & Quizzes */}
         {dashboard?.pending_checkpoints && dashboard.pending_checkpoints.length > 0 ? (
-          <View style={{ marginTop: 24 }}>
+          <View style={{ marginTop: 8 }}>
             <Text style={styles.sectionTitle}>Pending Checkpoints</Text>
             {dashboard.pending_checkpoints.map((cp) => (
               <View key={cp.id} style={[styles.checkpointCard, cardShadow(1)]}>
@@ -613,5 +664,66 @@ const styles = StyleSheet.create({
   checkpointSub: {
     fontSize: 12,
     color: Colors.textMuted,
+  },
+  interactiveGrid: {
+    flexDirection: 'row',
+    gap: 12,
+    marginTop: 8,
+  },
+  interactiveCard: {
+    flex: 1,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    justifyContent: 'space-between',
+  },
+  interactiveCardTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 10,
+  },
+  interactiveIconCircle: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  interactiveBadge: {
+    backgroundColor: '#FEF2F2',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 5,
+  },
+  interactiveBadgeText: {
+    fontSize: 9,
+    fontWeight: '800',
+    color: '#EF4444',
+  },
+  interactiveCardTitle: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: '#0F172A',
+    marginBottom: 4,
+    lineHeight: 18,
+  },
+  interactiveCardSub: {
+    fontSize: 11,
+    color: '#64748B',
+    lineHeight: 15,
+    marginBottom: 12,
+  },
+  interactiveLink: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  interactiveLinkText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: Colors.signal,
   },
 });

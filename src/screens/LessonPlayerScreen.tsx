@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback, useRef } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -13,15 +13,36 @@ import { WebView } from 'react-native-webview';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
+import * as FileSystem from 'expo-file-system/legacy';
+import * as Sharing from 'expo-sharing';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Colors, cardShadow } from '../theme/colors';
-import { lmsApi } from '../api/lmsApi';
-import { LessonDetail, CourseDetail } from '../api/types';
+import { lmsApi, API_BASE_URL } from '../api/lmsApi';
+import { LessonDetail, CourseDetail, LessonAttachment } from '../api/types';
+import { useAuth } from '../context/AuthContext';
+
+function extractYouTubeId(urlOrId?: string | null): string | null {
+  if (!urlOrId) return null;
+  const trimmed = urlOrId.trim();
+  if (/^[a-zA-Z0-9_-]{11}$/.test(trimmed)) return trimmed;
+  const match = /(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/|youtube-nocookie\.com\/embed\/)([^"&?\/\s]{11})/i.exec(trimmed);
+  return match ? match[1] : null;
+}
+
+function extractVimeoId(urlOrId?: string | number | null): string | null {
+  if (!urlOrId) return null;
+  const str = String(urlOrId).trim();
+  if (/^\d+$/.test(str)) return str;
+  const match = /vimeo\.com\/(?:channels\/(?:\w+\/)?|groups\/[^\/]*\/videos\/|album\/(?:\d+)\/video\/|video\/|)(\d+)/i.exec(str);
+  return match ? match[1] : null;
+}
 
 export const LessonPlayerScreen: React.FC<{ route: any; navigation: any }> = ({
   route,
   navigation,
 }) => {
   const insets = useSafeAreaInsets();
+  const { user } = useAuth();
   const { courseSlug, lessonId: initialLessonId, courseTitle: initialTitle } = route.params || {};
 
   const [currentLessonId, setCurrentLessonId] = useState<number | string>(initialLessonId);
@@ -30,8 +51,9 @@ export const LessonPlayerScreen: React.FC<{ route: any; navigation: any }> = ({
   const [loadingLesson, setLoadingLesson] = useState(true);
   const [completing, setCompleting] = useState(false);
   const [isCompleted, setIsCompleted] = useState(false);
+  const [downloadingAttachmentId, setDownloadingAttachmentId] = useState<number | string | null>(null);
 
-  // Load course details (for sections and navigation)
+  // Load course details
   useEffect(() => {
     let isMounted = true;
     (async () => {
@@ -78,7 +100,6 @@ export const LessonPlayerScreen: React.FC<{ route: any; navigation: any }> = ({
       } else {
         setIsCompleted(true);
         Alert.alert('Lesson Completed!', 'Great job making progress in this course.');
-        // Refresh course detail to update progress and checks
         if (courseSlug) {
           const updated = await lmsApi.getCourseDetail(courseSlug);
           if (updated) setCourseDetail(updated);
@@ -88,6 +109,64 @@ export const LessonPlayerScreen: React.FC<{ route: any; navigation: any }> = ({
       Alert.alert('Error', 'Could not mark lesson as complete.');
     } finally {
       setCompleting(false);
+    }
+  };
+
+  // Handle downloading resource / PDF
+  const handleDownloadAttachment = async (attachment: LessonAttachment, index: number) => {
+    const attachId = attachment.id || `att_${index}`;
+    setDownloadingAttachmentId(attachId);
+
+    try {
+      const token = user?.token || (await AsyncStorage.getItem('@tmm_academy_auth_token')) || '';
+      const safeName = (attachment.title || `Resource_${index + 1}`)
+        .replace(/[^a-zA-Z0-9_.-]/g, '_')
+        .toLowerCase();
+      const hasExtension = safeName.includes('.');
+      const filename = hasExtension ? safeName : `${safeName}.pdf`;
+      const targetUri = `${FileSystem.documentDirectory}${filename}`;
+
+      // Build target download URL
+      let downloadUrl = attachment.url || attachment.file_url || '';
+      if (!downloadUrl && attachment.id && lesson?.id && courseSlug) {
+        downloadUrl = lmsApi.getAttachmentDownloadUrl(courseSlug, lesson.id, attachment.id);
+      }
+
+      if (!downloadUrl) {
+        Alert.alert('Download Unavailable', 'No valid download link found for this resource.');
+        return;
+      }
+
+      // Prepend base URL if relative
+      if (downloadUrl.startsWith('/')) {
+        downloadUrl = `${API_BASE_URL}${downloadUrl}`;
+      }
+
+      const downloadResult = await FileSystem.downloadAsync(downloadUrl, targetUri, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          Accept: 'application/pdf,application/octet-stream,*/*',
+        },
+      });
+
+      if (downloadResult.status === 200) {
+        const canShare = await Sharing.isAvailableAsync();
+        if (canShare) {
+          await Sharing.shareAsync(downloadResult.uri, {
+            mimeType: filename.endsWith('.pdf') ? 'application/pdf' : 'application/octet-stream',
+            dialogTitle: `Open ${attachment.title || 'Course Resource'}`,
+            UTI: filename.endsWith('.pdf') ? 'com.adobe.pdf' : undefined,
+          });
+        } else {
+          Alert.alert('Downloaded', `Saved successfully to: ${downloadResult.uri}`);
+        }
+      } else {
+        Alert.alert('Download Failed', `Server responded with status: ${downloadResult.status}`);
+      }
+    } catch (err: any) {
+      Alert.alert('Download Error', err.message || 'Could not download course resource.');
+    } finally {
+      setDownloadingAttachmentId(null);
     }
   };
 
@@ -104,33 +183,100 @@ export const LessonPlayerScreen: React.FC<{ route: any; navigation: any }> = ({
   const nextLesson =
     currentIndex >= 0 && currentIndex < allLessons.length - 1 ? allLessons[currentIndex + 1] : null;
 
-  const vimeoId = lesson?.vimeo_id;
-  const vimeoEmbedHtml = vimeoId
-    ? `
-    <!DOCTYPE html>
-    <html>
-      <head>
-        <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-        <style>
-          * { margin: 0; padding: 0; box-sizing: border-box; }
-          body, html { width: 100%; height: 100%; background: #0F172A; overflow: hidden; display: flex; align-items: center; justify-content: center; }
-          .player-wrap { position: relative; width: 100%; height: 100%; }
-          iframe { position: absolute; top: 0; left: 0; width: 100%; height: 100%; border: 0; }
-        </style>
-      </head>
-      <body>
-        <div class="player-wrap">
-          <iframe
-            src="https://player.vimeo.com/video/${vimeoId}?autoplay=1&title=0&byline=0&portrait=0&transparent=0"
-            frameborder="0"
-            allow="autoplay; fullscreen; picture-in-picture"
-            allowfullscreen
-          ></iframe>
-        </div>
-      </body>
-    </html>
-  `
-    : null;
+  // Video source detection: YouTube vs Vimeo vs Direct Video
+  const youtubeId = lesson?.youtube_id || extractYouTubeId(lesson?.video_url);
+  const vimeoId = lesson?.vimeo_id || extractVimeoId(lesson?.video_url);
+
+  let videoEmbedHtml: string | null = null;
+  let videoSourceType: 'youtube' | 'vimeo' | 'direct' | 'none' = 'none';
+
+  if (youtubeId) {
+    videoSourceType = 'youtube';
+    videoEmbedHtml = `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+          <style>
+            * { margin: 0; padding: 0; box-sizing: border-box; }
+            body, html { width: 100%; height: 100%; background: #000000; overflow: hidden; display: flex; align-items: center; justify-content: center; }
+            .player-wrap { position: relative; width: 100%; height: 100%; }
+            iframe { position: absolute; top: 0; left: 0; width: 100%; height: 100%; border: 0; }
+          </style>
+        </head>
+        <body>
+          <div class="player-wrap">
+            <iframe
+              src="https://www.youtube-nocookie.com/embed/${youtubeId}?autoplay=1&playsinline=1&modestbranding=1&rel=0&fs=1"
+              frameborder="0"
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share; fullscreen"
+              allowfullscreen
+            ></iframe>
+          </div>
+        </body>
+      </html>
+    `;
+  } else if (vimeoId) {
+    videoSourceType = 'vimeo';
+    videoEmbedHtml = `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+          <style>
+            * { margin: 0; padding: 0; box-sizing: border-box; }
+            body, html { width: 100%; height: 100%; background: #0F172A; overflow: hidden; display: flex; align-items: center; justify-content: center; }
+            .player-wrap { position: relative; width: 100%; height: 100%; }
+            iframe { position: absolute; top: 0; left: 0; width: 100%; height: 100%; border: 0; }
+          </style>
+        </head>
+        <body>
+          <div class="player-wrap">
+            <iframe
+              src="https://player.vimeo.com/video/${vimeoId}?autoplay=1&title=0&byline=0&portrait=0&transparent=0"
+              frameborder="0"
+              allow="autoplay; fullscreen; picture-in-picture"
+              allowfullscreen
+            ></iframe>
+          </div>
+        </body>
+      </html>
+    `;
+  } else if (lesson?.video_url && lesson.video_url.startsWith('http')) {
+    videoSourceType = 'direct';
+    videoEmbedHtml = `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+          <style>
+            * { margin: 0; padding: 0; box-sizing: border-box; }
+            body, html { width: 100%; height: 100%; background: #000; overflow: hidden; display: flex; align-items: center; justify-content: center; }
+            video { width: 100%; height: 100%; object-fit: contain; }
+          </style>
+        </head>
+        <body>
+          <video src="${lesson.video_url}" controls autoplay playsinline></video>
+        </body>
+      </html>
+    `;
+  }
+
+  // Collect resources & PDF attachments
+  const attachmentsList: LessonAttachment[] = [];
+  if (Array.isArray(lesson?.attachments) && lesson.attachments.length > 0) {
+    attachmentsList.push(...lesson.attachments);
+  }
+  if (lesson?.pdf_url) {
+    const exists = attachmentsList.some((a) => a.url === lesson.pdf_url || a.file_url === lesson.pdf_url);
+    if (!exists) {
+      attachmentsList.push({
+        title: 'Lesson Guide & Reference PDF',
+        url: lesson.pdf_url,
+        type: 'pdf',
+      });
+    }
+  }
 
   return (
     <View style={styles.container}>
@@ -170,10 +316,10 @@ export const LessonPlayerScreen: React.FC<{ route: any; navigation: any }> = ({
             <ActivityIndicator size="large" color={Colors.signal} />
             <Text style={styles.loadingText}>Loading lesson video...</Text>
           </View>
-        ) : vimeoEmbedHtml ? (
+        ) : videoEmbedHtml ? (
           <WebView
             originWhitelist={['*']}
-            source={{ html: vimeoEmbedHtml }}
+            source={{ html: videoEmbedHtml }}
             style={styles.webview}
             allowsFullscreenVideo
             javaScriptEnabled
@@ -198,13 +344,33 @@ export const LessonPlayerScreen: React.FC<{ route: any; navigation: any }> = ({
         ]}
         showsVerticalScrollIndicator={false}
       >
-        {/* Lesson Title & Status */}
+        {/* Lesson Title & Provider Badge */}
         <View style={[styles.card, cardShadow(2)]}>
           <View style={styles.titleRow}>
             <Text style={styles.lessonTitle}>{lesson?.title || 'Lesson Overview'}</Text>
           </View>
 
           <View style={styles.metaRow}>
+            {/* Video Provider Badge */}
+            {videoSourceType === 'youtube' && (
+              <View style={[styles.providerBadge, { backgroundColor: '#FEF2F2', borderColor: '#FECACA' }]}>
+                <Ionicons name="logo-youtube" size={13} color="#EF4444" />
+                <Text style={[styles.providerBadgeText, { color: '#DC2626' }]}>YouTube</Text>
+              </View>
+            )}
+            {videoSourceType === 'vimeo' && (
+              <View style={[styles.providerBadge, { backgroundColor: '#F0F9FF', borderColor: '#BAE6FD' }]}>
+                <Ionicons name="videocam" size={13} color="#0284C7" />
+                <Text style={[styles.providerBadgeText, { color: '#0369A1' }]}>Vimeo</Text>
+              </View>
+            )}
+            {videoSourceType === 'direct' && (
+              <View style={[styles.providerBadge, { backgroundColor: '#ECFEFF', borderColor: '#A5F3FC' }]}>
+                <Ionicons name="play-circle" size={13} color={Colors.signal} />
+                <Text style={[styles.providerBadgeText, { color: Colors.signal }]}>Video Stream</Text>
+              </View>
+            )}
+
             {lesson?.duration_minutes ? (
               <View style={styles.metaPill}>
                 <Ionicons name="time-outline" size={14} color={Colors.signal} />
@@ -273,6 +439,77 @@ export const LessonPlayerScreen: React.FC<{ route: any; navigation: any }> = ({
             </View>
           ) : null}
         </View>
+
+        {/* Lesson Materials & Resources / PDF Section */}
+        {attachmentsList.length > 0 && (
+          <View style={[styles.materialsCard, cardShadow(2)]}>
+            <View style={styles.materialsHeader}>
+              <View style={styles.materialsIconCircle}>
+                <Ionicons name="document-attach" size={18} color={Colors.signal} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.materialsSectionTitle}>Lesson Resources & Materials</Text>
+                <Text style={styles.materialsSectionSub}>
+                  {attachmentsList.length} downloadable {attachmentsList.length === 1 ? 'file' : 'files'} for this lesson
+                </Text>
+              </View>
+            </View>
+
+            <View style={styles.materialsList}>
+              {attachmentsList.map((att, idx) => {
+                const attachId = att.id || `att_${idx}`;
+                const isDownloading = downloadingAttachmentId === attachId;
+                const isPdf =
+                  att.type === 'pdf' ||
+                  att.title?.toLowerCase().includes('.pdf') ||
+                  att.url?.toLowerCase().includes('.pdf');
+
+                return (
+                  <View key={attachId} style={styles.attachmentItemRow}>
+                    <View
+                      style={[
+                        styles.attachmentFileIcon,
+                        { backgroundColor: isPdf ? '#FEF2F2' : '#F0F9FF' },
+                      ]}
+                    >
+                      <Ionicons
+                        name={isPdf ? 'document-text' : 'folder-outline'}
+                        size={20}
+                        color={isPdf ? '#EF4444' : Colors.signal}
+                      />
+                    </View>
+
+                    <View style={{ flex: 1, marginRight: 10 }}>
+                      <Text style={styles.attachmentTitle} numberOfLines={1}>
+                        {att.title || 'Course Material'}
+                      </Text>
+                      <Text style={styles.attachmentMeta}>
+                        {isPdf ? 'PDF Document' : 'Resource File'}
+                        {att.size ? ` • ${att.size}` : ''}
+                      </Text>
+                    </View>
+
+                    <TouchableOpacity
+                      style={styles.downloadBtn}
+                      activeOpacity={0.8}
+                      onPress={() => void handleDownloadAttachment(att, idx)}
+                      disabled={isDownloading}
+                    >
+                      {isDownloading ? (
+                        <ActivityIndicator size="small" color={Colors.signal} />
+                      ) : (
+                        <>
+                          <Ionicons name="cloud-download-outline" size={15} color={Colors.signal} />
+                          <Text style={styles.downloadBtnText}>Open</Text>
+                        </>
+                      )}
+                    </TouchableOpacity>
+                  </View>
+                );
+              })}
+            </View>
+          </View>
+        )}
 
         {/* Prev & Next Navigation Buttons */}
         <View style={styles.navButtonsRow}>
@@ -409,7 +646,7 @@ export const LessonPlayerScreen: React.FC<{ route: any; navigation: any }> = ({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0F172A', // Dark canvas for cinema feel
+    backgroundColor: '#0F172A',
   },
   navBar: {
     flexDirection: 'row',
@@ -455,17 +692,17 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#090D16',
+    backgroundColor: '#1E293B',
   },
   loadingText: {
     color: Colors.textMuted,
-    fontSize: 13,
     marginTop: 10,
+    fontSize: 13,
   },
   noVideoText: {
     color: Colors.textMuted,
+    marginTop: 10,
     fontSize: 13,
-    marginTop: 8,
   },
   scrollContainer: {
     flex: 1,
@@ -480,6 +717,7 @@ const styles = StyleSheet.create({
     padding: 18,
     borderWidth: 1,
     borderColor: Colors.borderSubtle,
+    marginBottom: 16,
   },
   titleRow: {
     marginBottom: 10,
@@ -493,36 +731,50 @@ const styles = StyleSheet.create({
   metaRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
+    gap: 8,
     marginBottom: 16,
+    flexWrap: 'wrap',
+  },
+  providerBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+    borderWidth: 1,
+  },
+  providerBadgeText: {
+    fontSize: 11,
+    fontWeight: '700',
   },
   metaPill: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    gap: 5,
     backgroundColor: Colors.surfaceElevated,
     paddingHorizontal: 10,
-    paddingVertical: 5,
+    paddingVertical: 4,
     borderRadius: 8,
   },
   metaPillText: {
     fontSize: 12,
+    color: Colors.textSecondary,
     fontWeight: '600',
-    color: Colors.textMain,
   },
   statusBadge: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
     paddingHorizontal: 10,
-    paddingVertical: 5,
+    paddingVertical: 4,
     borderRadius: 8,
   },
   statusBadgeActive: {
-    backgroundColor: 'rgba(2, 132, 199, 0.1)',
+    backgroundColor: '#ECFEFF',
   },
   statusBadgeDone: {
-    backgroundColor: 'rgba(16, 185, 129, 0.1)',
+    backgroundColor: '#ECFDF5',
   },
   statusBadgeText: {
     fontSize: 12,
@@ -534,45 +786,124 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 8,
     paddingVertical: 12,
-    borderRadius: 10,
+    borderRadius: 12,
     marginTop: 4,
   },
   completeBtnActive: {
     backgroundColor: Colors.signal,
   },
   completeBtnDone: {
-    backgroundColor: 'rgba(16, 185, 129, 0.12)',
+    backgroundColor: '#ECFDF5',
     borderWidth: 1,
     borderColor: Colors.emerald,
   },
   completeBtnText: {
+    color: '#FFFFFF',
     fontSize: 14,
     fontWeight: '700',
-    color: '#FFFFFF',
   },
   completeBtnTextDone: {
     color: Colors.emerald,
   },
   summaryBox: {
-    marginTop: 18,
-    paddingTop: 16,
+    marginTop: 16,
+    paddingTop: 14,
     borderTopWidth: 1,
     borderTopColor: Colors.borderSubtle,
   },
   summaryTitle: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '700',
     color: Colors.textMain,
-    marginBottom: 6,
+    marginBottom: 4,
   },
   summaryText: {
+    fontSize: 13,
+    color: Colors.textSecondary,
+    lineHeight: 20,
+  },
+  materialsCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    marginBottom: 16,
+  },
+  materialsHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginBottom: 14,
+  },
+  materialsIconCircle: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: '#ECFEFF',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  materialsSectionTitle: {
     fontSize: 14,
-    color: Colors.textMuted,
-    lineHeight: 22,
+    fontWeight: '800',
+    color: '#0F172A',
+  },
+  materialsSectionSub: {
+    fontSize: 11,
+    color: '#64748B',
+    marginTop: 1,
+  },
+  materialsList: {
+    gap: 10,
+  },
+  attachmentItemRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F8FAFC',
+    borderRadius: 12,
+    padding: 10,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  attachmentFileIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 10,
+  },
+  attachmentTitle: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#0F172A',
+  },
+  attachmentMeta: {
+    fontSize: 11,
+    color: '#64748B',
+    marginTop: 2,
+  },
+  downloadBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 8,
+    backgroundColor: '#ECFEFF',
+    borderWidth: 1,
+    borderColor: '#A5F3FC',
+  },
+  downloadBtnText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: Colors.signal,
   },
   navButtonsRow: {
     flexDirection: 'row',
-    marginTop: 16,
+    alignItems: 'center',
+    marginBottom: 20,
   },
   stepBtn: {
     flex: 1,
@@ -589,9 +920,8 @@ const styles = StyleSheet.create({
   },
   stepBtnSub: {
     fontSize: 11,
-    fontWeight: '600',
     color: Colors.textMuted,
-    textTransform: 'uppercase',
+    fontWeight: '600',
   },
   stepBtnTitle: {
     fontSize: 13,
@@ -600,7 +930,7 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   syllabusSection: {
-    marginTop: 24,
+    marginTop: 4,
   },
   syllabusHeading: {
     fontSize: 16,
@@ -626,17 +956,21 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingVertical: 10,
-    paddingHorizontal: 8,
-    borderRadius: 8,
+    borderTopWidth: 1,
+    borderTopColor: Colors.borderSubtle,
     gap: 10,
   },
   lessonItemRowCurrent: {
-    backgroundColor: 'rgba(2, 132, 199, 0.08)',
+    backgroundColor: '#ECFEFF',
+    marginHorizontal: -10,
+    paddingHorizontal: 10,
+    borderRadius: 8,
+    borderTopWidth: 0,
   },
   lessonItemTitle: {
     flex: 1,
     fontSize: 13,
-    color: Colors.textMain,
+    color: Colors.textSecondary,
     fontWeight: '500',
   },
   lessonItemTitleCurrent: {
@@ -644,7 +978,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   lessonItemTime: {
-    fontSize: 12,
+    fontSize: 11,
     color: Colors.textMuted,
     fontWeight: '600',
   },

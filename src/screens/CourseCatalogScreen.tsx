@@ -62,28 +62,77 @@ export const CourseCatalogScreen: React.FC<{ navigation: any }> = ({ navigation 
 
     const durationHours = Math.round(item.duration_minutes / 60);
 
+    const priceInfo = (() => {
+      if (item.is_free === true) return { isFree: true, label: 'FREE' };
+      if (typeof item.price_cents === 'number') {
+        if (item.price_cents === 0) return { isFree: true, label: 'FREE' };
+        const euros = item.price_cents / 100;
+        return { isFree: false, label: euros % 1 === 0 ? `€${euros}` : `€${euros.toFixed(2)}` };
+      }
+      if (typeof item.price === 'number') {
+        if (item.price === 0) return { isFree: true, label: 'FREE' };
+        return { isFree: false, label: `€${item.price}` };
+      }
+      if (item.price_formatted) return { isFree: false, label: item.price_formatted };
+      return { isFree: true, label: 'FREE' };
+    })();
+
     return (
       <TouchableOpacity
         activeOpacity={0.88}
         style={[styles.courseCard, cardShadow(2)]}
         onPress={() => navigation.navigate('CourseDetail', { course: item })}
       >
-        {Boolean(imageUrl) && (
-          <Image
-            source={{ uri: imageUrl }}
-            style={styles.courseImage}
-            resizeMode="cover"
-          />
-        )}
+        <View style={styles.imageWrapper}>
+          {Boolean(imageUrl) && (
+            <Image
+              source={{ uri: imageUrl }}
+              style={styles.courseImage}
+              resizeMode="cover"
+            />
+          )}
+          {/* Price Tag Overlay */}
+          <View
+            style={[
+              styles.priceBadgeOverlay,
+              priceInfo.isFree ? styles.priceBadgeFree : styles.priceBadgePaid,
+            ]}
+          >
+            <Text
+              style={[
+                styles.priceBadgeText,
+                priceInfo.isFree ? styles.priceBadgeTextFree : styles.priceBadgeTextPaid,
+              ]}
+            >
+              {priceInfo.label}
+            </Text>
+          </View>
+        </View>
 
         <View style={styles.cardContent}>
-          {item.eyebrow ? (
-            <View style={styles.badgeRow}>
+          <View style={styles.badgeRow}>
+            {item.eyebrow ? (
               <View style={styles.eyebrowBadge}>
                 <Text style={styles.eyebrowText}>{item.eyebrow}</Text>
               </View>
+            ) : null}
+
+            <View
+              style={[
+                styles.priceInlinePill,
+                priceInfo.isFree ? styles.priceBadgeFree : styles.priceBadgePaid,
+              ]}
+            >
+              <Text
+                style={[
+                  styles.priceInlinePillText,
+                  priceInfo.isFree ? styles.priceBadgeTextFree : styles.priceBadgeTextPaid,
+                ]}
+              >
+                {priceInfo.isFree ? 'Free Course' : priceInfo.label}
+              </Text>
             </View>
-          ) : null}
+          </View>
 
           <Text style={styles.courseTitle} numberOfLines={2}>
             {item.title}
@@ -113,7 +162,7 @@ export const CourseCatalogScreen: React.FC<{ navigation: any }> = ({ navigation 
                   { color: item.is_enrolled ? Colors.emerald : Colors.signal },
                 ]}
               >
-                {item.is_enrolled ? 'Enrolled' : 'Available'}
+                {item.is_enrolled ? 'Enrolled' : priceInfo.isFree ? 'Free' : priceInfo.label}
               </Text>
             </View>
           </View>
@@ -240,16 +289,53 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: Colors.borderSubtle,
   },
-  courseImage: {
+  imageWrapper: {
+    position: 'relative',
     width: '100%',
     height: 165,
     backgroundColor: Colors.surfaceElevated,
+  },
+  courseImage: {
+    width: '100%',
+    height: '100%',
+  },
+  priceBadgeOverlay: {
+    position: 'absolute',
+    top: 10,
+    right: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 8,
+    borderWidth: 1,
+  },
+  priceBadgeFree: {
+    backgroundColor: '#ECFDF5',
+    borderColor: '#A7F3D0',
+  },
+  priceBadgePaid: {
+    backgroundColor: 'rgba(15, 23, 42, 0.88)',
+    borderColor: '#334155',
+  },
+  priceBadgeText: {
+    fontSize: 12,
+    fontWeight: '800',
+    letterSpacing: 0.3,
+  },
+  priceBadgeTextFree: {
+    color: '#059669',
+  },
+  priceBadgeTextPaid: {
+    color: '#FFFFFF',
   },
   cardContent: {
     padding: 16,
   },
   badgeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
     marginBottom: 8,
+    flexWrap: 'wrap',
   },
   eyebrowBadge: {
     alignSelf: 'flex-start',
@@ -262,6 +348,16 @@ const styles = StyleSheet.create({
   },
   eyebrowText: {
     color: Colors.signal,
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  priceInlinePill: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 6,
+    borderWidth: 1,
+  },
+  priceInlinePillText: {
     fontSize: 11,
     fontWeight: '700',
   },

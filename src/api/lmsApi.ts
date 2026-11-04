@@ -19,6 +19,8 @@ import {
   TwoFactorConfirmResponse,
   UpdateProfilePayload,
   ChangePasswordPayload,
+  SupportTicket,
+  LiveClassItem,
 } from './types';
 import { getDeviceId, getDeviceName } from '../utils/deviceInfo';
 
@@ -616,6 +618,76 @@ class LmsApiClient {
 
   getCertificateDownloadUrl(certificateId: number | string): string {
     return `${API_BASE_URL}/api/v1/certificates/${certificateId}/download`;
+  }
+
+  getAttachmentDownloadUrl(courseSlug: string, lessonId: string | number, attachmentId: string | number): string {
+    return `${API_BASE_URL}/api/v1/courses/${courseSlug}/lessons/${lessonId}/attachments/${attachmentId}/download`;
+  }
+
+  async enrollCourse(courseSlug: string): Promise<{ success: boolean; message?: string; error?: string }> {
+    await this.ensureCsrf();
+    const res = await this.request<{ message?: string }>(`/api/v1/courses/${courseSlug}/enroll`, {
+      method: 'POST',
+    });
+    if (res.error) {
+      return { success: false, error: res.error };
+    }
+    return { success: true, message: res.data?.message || 'Enrolled successfully!' };
+  }
+
+  async joinLiveSession(courseSlug: string, sessionId: string | number): Promise<{ success: boolean; join_url?: string; error?: string }> {
+    const res = await this.request<{ join_url?: string }>(`/api/v1/courses/${courseSlug}/live-sessions/${sessionId}/join`);
+    if (res.error) {
+      return { success: false, error: res.error };
+    }
+    return { success: true, join_url: res.data?.join_url };
+  }
+
+  async getSupportTickets(): Promise<SupportTicket[]> {
+    const res = await this.request<any>('/api/v1/support/tickets');
+    if (!res.data) return [];
+    if (Array.isArray(res.data.tickets)) return res.data.tickets;
+    if (Array.isArray(res.data.data)) return res.data.data;
+    if (Array.isArray(res.data)) return res.data;
+    return [];
+  }
+
+  async getSupportTicket(ticketId: string | number): Promise<SupportTicket | null> {
+    const res = await this.request<any>(`/api/v1/support/tickets/${ticketId}`);
+    if (!res.data) return null;
+    return (res.data.ticket || res.data.data || res.data) as SupportTicket;
+  }
+
+  async createSupportTicket(payload: {
+    subject: string;
+    message: string;
+    priority?: 'low' | 'normal' | 'high';
+    course_id?: number | null;
+  }): Promise<{ success: boolean; data?: SupportTicket; error?: string }> {
+    await this.ensureCsrf();
+    const res = await this.request<any>('/api/v1/support/tickets', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+    if (res.error) {
+      return { success: false, error: res.error };
+    }
+    return { success: true, data: res.data?.ticket || res.data };
+  }
+
+  async replySupportTicket(
+    ticketId: string | number,
+    body: string
+  ): Promise<{ success: boolean; message?: string; error?: string }> {
+    await this.ensureCsrf();
+    const res = await this.request<any>(`/api/v1/support/tickets/${ticketId}/reply`, {
+      method: 'POST',
+      body: JSON.stringify({ body }),
+    });
+    if (res.error) {
+      return { success: false, error: res.error };
+    }
+    return { success: true, message: res.data?.message || 'Reply posted' };
   }
 
   // ==========================================
