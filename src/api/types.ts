@@ -70,6 +70,7 @@ export interface CourseCatalogItem {
 
 export interface CourseDetail extends CourseCatalogItem {
   sections: CourseSection[];
+  activities?: ActivitySummary[];
   reviews: CourseReview[];
   instructor?: {
     name: string;
@@ -131,6 +132,27 @@ export interface ActivitySummary {
   passing_score?: number;
   max_attempts?: number;
   is_completed?: boolean;
+}
+
+export interface QuizQuestion {
+  id?: number;
+  question: string;
+  options: string[];
+}
+
+export interface ActivityDetail {
+  id: number;
+  type: 'quiz' | 'exam' | 'test' | 'project';
+  title: string;
+  description?: string;
+  passing_score?: number;
+  max_attempts?: number;
+  attempts_count?: number;
+  questions?: QuizQuestion[];
+  is_completed?: boolean;
+  score?: number;
+  passed?: boolean;
+  can_attempt?: boolean;
 }
 
 export interface CertificateItem {

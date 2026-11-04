@@ -269,6 +269,26 @@ export const DashboardScreen: React.FC<{ navigation: any }> = ({ navigation }) =
             </TouchableOpacity>
           </View>
         )}
+
+        {/* Pending Checkpoints & Quizzes */}
+        {dashboard?.pending_checkpoints && dashboard.pending_checkpoints.length > 0 ? (
+          <View style={{ marginTop: 24 }}>
+            <Text style={styles.sectionTitle}>Pending Checkpoints</Text>
+            {dashboard.pending_checkpoints.map((cp) => (
+              <View key={cp.id} style={[styles.checkpointCard, cardShadow(1)]}>
+                <View style={styles.checkpointIconCircle}>
+                  <Ionicons name="help-circle" size={24} color="#F59E0B" />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.checkpointTitle}>{cp.title}</Text>
+                  <Text style={styles.checkpointSub}>
+                    Passing requirement: {cp.passing_score || 70}%
+                  </Text>
+                </View>
+              </View>
+            ))}
+          </View>
+        ) : null}
       </ScrollView>
     </View>
   );
@@ -564,5 +584,34 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 15,
     fontWeight: '700',
+  },
+  checkpointCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Colors.surface,
+    borderRadius: 14,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: Colors.borderSubtle,
+    marginBottom: 10,
+    gap: 14,
+  },
+  checkpointIconCircle: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: 'rgba(245, 158, 11, 0.1)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  checkpointTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: Colors.textMain,
+    marginBottom: 2,
+  },
+  checkpointSub: {
+    fontSize: 12,
+    color: Colors.textMuted,
   },
 });

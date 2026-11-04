@@ -182,6 +182,50 @@ export const CourseDetailScreen: React.FC<{ route: any; navigation: any }> = ({
                   ))}
                 </View>
               ))}
+
+              {/* Checkpoints & Quizzes if any */}
+              {detail?.activities && detail.activities.length > 0 ? (
+                <View style={{ marginTop: 18 }}>
+                  <Text style={styles.sectionHeading}>Quizzes & Checkpoints</Text>
+                  {detail.activities.map((act) => (
+                    <TouchableOpacity
+                      key={act.id}
+                      style={[styles.activityCard, cardShadow(1)]}
+                      activeOpacity={course.is_enrolled ? 0.7 : 1}
+                      onPress={() => {
+                        if (course.is_enrolled) {
+                          navigation.navigate('Quiz', {
+                            courseSlug: course.slug,
+                            activityId: act.id,
+                            activityTitle: act.title,
+                            courseTitle: course.title,
+                          });
+                        }
+                      }}
+                    >
+                      <View style={styles.activityIconCircle}>
+                        <Ionicons
+                          name={act.type === 'project' ? 'folder-outline' : 'help-circle-outline'}
+                          size={20}
+                          color={Colors.signal}
+                        />
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.activityTitle}>{act.title}</Text>
+                        <Text style={styles.activitySub}>
+                          {act.type.toUpperCase()} • Passing: {act.passing_score || 70}%
+                        </Text>
+                      </View>
+                      {course.is_enrolled && (
+                        <View style={styles.takeQuizBadge}>
+                          <Text style={styles.takeQuizText}>Start</Text>
+                          <Ionicons name="arrow-forward" size={12} color={Colors.signal} />
+                        </View>
+                      )}
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              ) : null}
             </View>
           ) : null}
         </ScrollView>
@@ -454,5 +498,49 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 14,
     fontWeight: '700',
+  },
+  activityCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Colors.surface,
+    borderRadius: 14,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: Colors.borderSubtle,
+    marginBottom: 10,
+    gap: 12,
+  },
+  activityIconCircle: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: 'rgba(2, 132, 199, 0.08)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  activityTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: Colors.textMain,
+    marginBottom: 2,
+  },
+  activitySub: {
+    fontSize: 11,
+    color: Colors.textMuted,
+    fontWeight: '600',
+  },
+  takeQuizBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 8,
+    backgroundColor: 'rgba(2, 132, 199, 0.08)',
+  },
+  takeQuizText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: Colors.signal,
   },
 });

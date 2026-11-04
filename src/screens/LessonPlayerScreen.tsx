@@ -368,6 +368,37 @@ export const LessonPlayerScreen: React.FC<{ route: any; navigation: any }> = ({
                 })}
               </View>
             ))}
+
+            {courseDetail?.activities && courseDetail.activities.length > 0 ? (
+              <View style={[styles.sectionCard, cardShadow(1)]}>
+                <Text style={styles.sectionTitle}>Checkpoints & Quizzes</Text>
+                {courseDetail.activities.map((act) => (
+                  <TouchableOpacity
+                    key={act.id}
+                    style={styles.lessonItemRow}
+                    onPress={() => {
+                      navigation.navigate('Quiz', {
+                        courseSlug,
+                        activityId: act.id,
+                        activityTitle: act.title,
+                        courseTitle: courseDetail.title,
+                      });
+                    }}
+                    activeOpacity={0.7}
+                  >
+                    <Ionicons
+                      name={act.is_completed ? 'checkmark-circle' : 'help-circle-outline'}
+                      size={20}
+                      color={act.is_completed ? Colors.emerald : '#F59E0B'}
+                    />
+                    <Text style={styles.lessonItemTitle} numberOfLines={2}>
+                      {act.title}
+                    </Text>
+                    <Ionicons name="chevron-forward" size={14} color={Colors.textMuted} />
+                  </TouchableOpacity>
+                ))}
+              </View>
+            ) : null}
           </View>
         ) : null}
       </ScrollView>

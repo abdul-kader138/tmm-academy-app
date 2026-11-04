@@ -14,6 +14,7 @@ import {
   DashboardSummary,
   CertificateItem,
   ActivitySummary,
+  ActivityDetail,
   TwoFactorSetupResponse,
   TwoFactorConfirmResponse,
   UpdateProfilePayload,
@@ -562,6 +563,34 @@ class LmsApiClient {
     return this.request(`/api/v1/courses/${courseSlug}/lessons/${lessonIdOrSlug}/complete`, {
       method: 'POST',
     });
+  }
+
+  async getActivity(courseSlug: string, activityId: number | string): Promise<ActivityDetail | null> {
+    const res = await this.request<any>(`/api/v1/courses/${courseSlug}/activities/${activityId}`);
+    if (!res.data) return null;
+    return (res.data.activity || res.data.data || res.data) as ActivityDetail;
+  }
+
+  async submitQuizAnswers(
+    courseSlug: string,
+    activityId: number | string,
+    answers: Record<string, number>
+  ): Promise<{ success: boolean; score?: number; passed?: boolean; error?: string; message?: string }> {
+    await this.ensureCsrf();
+    const res = await this.request<any>(`/api/v1/courses/${courseSlug}/activities/${activityId}/test`, {
+      method: 'POST',
+      body: JSON.stringify({ answers }),
+    });
+    if (res.error) {
+      return { success: false, error: res.error };
+    }
+    const d = res.data || {};
+    return {
+      success: true,
+      score: d.score,
+      passed: d.passed,
+      message: d.message || 'Quiz submitted successfully',
+    };
   }
 
   async getCertificates(): Promise<CertificateItem[]> {
