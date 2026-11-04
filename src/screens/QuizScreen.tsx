@@ -48,6 +48,7 @@ export const QuizScreen: React.FC<{ route: any; navigation: any }> = ({ route, n
   const questions = activity?.questions || [];
   const totalQuestions = questions.length;
   const currentQuestion = questions[currentIndex];
+  const isCurrentAnswered = selectedAnswers[currentIndex] !== undefined;
 
   const handleSelectOption = (optionIndex: number) => {
     setSelectedAnswers((prev) => ({
@@ -68,9 +69,9 @@ export const QuizScreen: React.FC<{ route: any; navigation: any }> = ({ route, n
         ]
       );
     } else {
-      Alert.alert('Submit Answers', 'Are you ready to submit your test for scoring?', [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Submit', onPress: () => void executeSubmit() },
+      Alert.alert('Submit Quiz', 'Are you ready to submit your test for scoring?', [
+        { text: 'Review', style: 'cancel' },
+        { text: 'Submit Now', onPress: () => void executeSubmit() },
       ]);
     }
   };
@@ -78,7 +79,6 @@ export const QuizScreen: React.FC<{ route: any; navigation: any }> = ({ route, n
   const executeSubmit = async () => {
     setSubmitting(true);
     try {
-      // Map zero-based question index to option index
       const answerPayload: Record<string, number> = {};
       Object.entries(selectedAnswers).forEach(([qIdx, optIdx]) => {
         answerPayload[qIdx] = optIdx;
@@ -105,7 +105,7 @@ export const QuizScreen: React.FC<{ route: any; navigation: any }> = ({ route, n
     <View style={styles.container}>
       <StatusBar style="dark" animated />
 
-      {/* Top Navbar */}
+      {/* Modern Top Header */}
       <View
         style={[
           styles.header,
@@ -119,7 +119,7 @@ export const QuizScreen: React.FC<{ route: any; navigation: any }> = ({ route, n
           onPress={() => navigation.goBack()}
           activeOpacity={0.7}
         >
-          <Ionicons name="arrow-back" size={22} color={Colors.textMain} />
+          <Ionicons name="arrow-back" size={20} color={Colors.textMain} />
         </TouchableOpacity>
 
         <View style={styles.headerTitleWrap}>
@@ -131,7 +131,9 @@ export const QuizScreen: React.FC<{ route: any; navigation: any }> = ({ route, n
           </Text>
         </View>
 
-        <View style={{ width: 40 }} />
+        <View style={styles.headerRightBadge}>
+          <Ionicons name="shield-checkmark" size={14} color={Colors.signal} />
+        </View>
       </View>
 
       {loading ? (
@@ -146,7 +148,7 @@ export const QuizScreen: React.FC<{ route: any; navigation: any }> = ({ route, n
             <View
               style={[
                 styles.resultIconCircle,
-                { backgroundColor: result.passed ? 'rgba(16, 185, 129, 0.1)' : 'rgba(239, 68, 68, 0.1)' },
+                { backgroundColor: result.passed ? '#ECFDF5' : '#FEF2F2' },
               ]}
             >
               <Ionicons
@@ -157,24 +159,33 @@ export const QuizScreen: React.FC<{ route: any; navigation: any }> = ({ route, n
             </View>
 
             <Text style={styles.resultTitle}>
-              {result.passed ? 'Congratulations!' : 'Keep Practicing!'}
+              {result.passed ? 'Quiz Passed!' : 'Needs Review'}
             </Text>
 
             <Text style={styles.resultMessage}>
               {result.message ||
                 (result.passed
-                  ? 'You have successfully satisfied this checkpoint requirement.'
-                  : 'You did not achieve the required passing score on this attempt.')}
+                  ? 'Great work! You have satisfied this checkpoint requirement.'
+                  : 'You did not achieve the required score on this attempt. You can review the course material and try again.')}
             </Text>
 
             {typeof result.score === 'number' && (
               <View style={styles.scoreBox}>
                 <Text style={styles.scoreLabel}>Final Score</Text>
-                <Text style={styles.scoreValue}>{result.score}%</Text>
+                <Text
+                  style={[
+                    styles.scoreValue,
+                    { color: result.passed ? Colors.emerald : '#EF4444' },
+                  ]}
+                >
+                  {result.score}%
+                </Text>
                 {activity?.passing_score ? (
-                  <Text style={styles.scoreSub}>
-                    Required Passing Score: {activity.passing_score}%
-                  </Text>
+                  <View style={styles.passingPill}>
+                    <Text style={styles.scoreSub}>
+                      Passing Requirement: {activity.passing_score}%
+                    </Text>
+                  </View>
                 ) : null}
               </View>
             )}
@@ -184,32 +195,35 @@ export const QuizScreen: React.FC<{ route: any; navigation: any }> = ({ route, n
               onPress={() => navigation.goBack()}
               activeOpacity={0.85}
             >
-              <Text style={styles.returnBtnText}>Back to Course</Text>
+              <Text style={styles.returnBtnText}>Return to Course</Text>
               <Ionicons name="arrow-forward" size={16} color="#FFFFFF" />
             </TouchableOpacity>
           </View>
         </ScrollView>
       ) : totalQuestions === 0 ? (
-        /* No questions / Project deliverable notice */
+        /* No questions */
         <View style={styles.centerBox}>
           <View style={styles.emptyIconCircle}>
             <Ionicons name="document-text-outline" size={44} color={Colors.textMuted} />
           </View>
           <Text style={styles.emptyTitle}>Checkpoint Details</Text>
           <Text style={styles.emptyDesc}>
-            {activity?.description ||
-              'This checkpoint is managed by course instructors. No automated multiple-choice questions are required at this time.'}
+            {activity?.instructions ||
+              activity?.description ||
+              'This checkpoint is managed by course instructors. No multiple-choice questions are required at this time.'}
           </Text>
           {activity?.passing_score ? (
-            <Text style={styles.infoPill}>Passing threshold: {activity.passing_score}%</Text>
+            <View style={styles.infoPill}>
+              <Text style={styles.infoPillText}>Passing score: {activity.passing_score}%</Text>
+            </View>
           ) : null}
         </View>
       ) : (
-        /* Questions Stepper */
+        /* Active Quiz Screen */
         <View style={styles.stepperContainer}>
-          {/* Progress Bar */}
-          <View style={styles.progressRow}>
-            <View style={styles.progressBarBg}>
+          {/* Creative Progress Bar */}
+          <View style={styles.progressSection}>
+            <View style={styles.progressBarWrapper}>
               <View
                 style={[
                   styles.progressBarFill,
@@ -217,9 +231,11 @@ export const QuizScreen: React.FC<{ route: any; navigation: any }> = ({ route, n
                 ]}
               />
             </View>
-            <Text style={styles.progressText}>
-              {currentIndex + 1} / {totalQuestions}
-            </Text>
+            <View style={styles.progressCounterBadge}>
+              <Text style={styles.progressCounterCurrent}>{currentIndex + 1}</Text>
+              <Text style={styles.progressCounterDivider}>/</Text>
+              <Text style={styles.progressCounterTotal}>{totalQuestions}</Text>
+            </View>
           </View>
 
           <ScrollView
@@ -227,27 +243,43 @@ export const QuizScreen: React.FC<{ route: any; navigation: any }> = ({ route, n
             contentContainerStyle={styles.questionContent}
             showsVerticalScrollIndicator={false}
           >
-            {/* Optional Instructions */}
+            {/* Friendly Instructions Banner */}
             {activity?.instructions ? (
               <View style={styles.instructionsBanner}>
-                <Ionicons name="information-circle-outline" size={18} color={Colors.signal} />
+                <View style={styles.instructionsIconCircle}>
+                  <Ionicons name="bulb-outline" size={16} color={Colors.signal} />
+                </View>
                 <Text style={styles.instructionsText}>{activity.instructions}</Text>
               </View>
             ) : null}
 
-            {/* Question Text */}
-            <View style={[styles.questionCard, cardShadow(1)]}>
-              <View style={styles.questionCardHeader}>
-                <Text style={styles.questionNumberText}>Question {currentIndex + 1}</Text>
-                {activity?.passing_score ? (
-                  <Text style={styles.passThresholdBadge}>
-                    Pass: {activity.passing_score}%
+            {/* Creative Question Card */}
+            <View style={[styles.questionCard, cardShadow(2)]}>
+              <View style={styles.questionCardTop}>
+                <View style={styles.questionTag}>
+                  <Ionicons name="help-circle" size={14} color={Colors.signal} />
+                  <Text style={styles.questionTagText}>
+                    QUESTION {currentIndex + 1 < 10 ? `0${currentIndex + 1}` : currentIndex + 1}
                   </Text>
+                </View>
+                {activity?.passing_score ? (
+                  <View style={styles.passBadge}>
+                    <Text style={styles.passBadgeText}>Pass: {activity.passing_score}%</Text>
+                  </View>
                 ) : null}
               </View>
+
               <Text style={styles.questionPrompt}>
-                {currentQuestion.prompt || (currentQuestion as any).question || (currentQuestion as any).title || ''}
+                {currentQuestion.prompt ||
+                  (currentQuestion as any).question ||
+                  (currentQuestion as any).title ||
+                  ''}
               </Text>
+            </View>
+
+            {/* Choose the best answer header */}
+            <View style={styles.optionsHeaderRow}>
+              <Text style={styles.optionsSectionTitle}>Select the correct option:</Text>
             </View>
 
             {/* Options List */}
@@ -268,42 +300,56 @@ export const QuizScreen: React.FC<{ route: any; navigation: any }> = ({ route, n
                     key={optIdx}
                     style={[
                       styles.optionCard,
-                      cardShadow(1),
-                      isSelected && styles.optionCardSelected,
+                      isSelected ? styles.optionCardSelected : styles.optionCardDefault,
                     ]}
                     onPress={() => handleSelectOption(optIdx)}
-                    activeOpacity={0.8}
+                    activeOpacity={0.85}
                   >
+                    {/* Letter Badge (A, B, C, D) */}
                     <View
                       style={[
-                        styles.optionLetterBadge,
-                        isSelected && styles.optionLetterBadgeSelected,
+                        styles.letterBadge,
+                        isSelected ? styles.letterBadgeSelected : styles.letterBadgeDefault,
                       ]}
                     >
                       <Text
                         style={[
-                          styles.optionLetterText,
-                          isSelected && styles.optionLetterTextSelected,
+                          styles.letterBadgeText,
+                          isSelected ? styles.letterBadgeTextSelected : styles.letterBadgeTextDefault,
                         ]}
                       >
                         {letter}
                       </Text>
                     </View>
+
+                    {/* Option Text */}
                     <Text
                       style={[
-                        styles.optionTitle,
-                        isSelected && styles.optionTitleSelected,
+                        styles.optionText,
+                        isSelected ? styles.optionTextSelected : styles.optionTextDefault,
                       ]}
                     >
                       {optionLabel}
                     </Text>
+
+                    {/* Radio Checkbox Indicator */}
+                    <View
+                      style={[
+                        styles.radioIndicator,
+                        isSelected ? styles.radioIndicatorSelected : styles.radioIndicatorDefault,
+                      ]}
+                    >
+                      {isSelected && (
+                        <Ionicons name="checkmark" size={13} color="#FFFFFF" />
+                      )}
+                    </View>
                   </TouchableOpacity>
                 );
               })}
             </View>
           </ScrollView>
 
-          {/* Stepper Footer */}
+          {/* Stepper Footer Action Bar */}
           <View
             style={[
               styles.footer,
@@ -312,22 +358,36 @@ export const QuizScreen: React.FC<{ route: any; navigation: any }> = ({ route, n
             ]}
           >
             <TouchableOpacity
-              style={[styles.stepNavBtn, currentIndex === 0 && { opacity: 0.4 }]}
+              style={[styles.prevBtn, currentIndex === 0 && styles.prevBtnDisabled]}
               onPress={() => setCurrentIndex((p) => Math.max(0, p - 1))}
               disabled={currentIndex === 0}
               activeOpacity={0.7}
             >
-              <Ionicons name="arrow-back" size={16} color={Colors.textMain} />
-              <Text style={styles.stepNavBtnText}>Previous</Text>
+              <Ionicons
+                name="arrow-back"
+                size={16}
+                color={currentIndex === 0 ? '#94A3B8' : Colors.textMain}
+              />
+              <Text
+                style={[
+                  styles.prevBtnText,
+                  currentIndex === 0 && styles.prevBtnTextDisabled,
+                ]}
+              >
+                Previous
+              </Text>
             </TouchableOpacity>
 
             {currentIndex < totalQuestions - 1 ? (
               <TouchableOpacity
-                style={styles.stepNextBtn}
+                style={[
+                  styles.nextBtn,
+                  !isCurrentAnswered && styles.nextBtnPending,
+                ]}
                 onPress={() => setCurrentIndex((p) => Math.min(totalQuestions - 1, p + 1))}
                 activeOpacity={0.85}
               >
-                <Text style={styles.stepNextBtnText}>Next Question</Text>
+                <Text style={styles.nextBtnText}>Next Question</Text>
                 <Ionicons name="arrow-forward" size={16} color="#FFFFFF" />
               </TouchableOpacity>
             ) : (
@@ -342,7 +402,7 @@ export const QuizScreen: React.FC<{ route: any; navigation: any }> = ({ route, n
                 ) : (
                   <>
                     <Text style={styles.submitBtnText}>Submit Quiz</Text>
-                    <Ionicons name="checkmark-circle" size={16} color="#FFFFFF" />
+                    <Ionicons name="checkmark-circle" size={17} color="#FFFFFF" />
                   </>
                 )}
               </TouchableOpacity>
@@ -357,7 +417,7 @@ export const QuizScreen: React.FC<{ route: any; navigation: any }> = ({ route, n
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.canvas,
+    backgroundColor: '#F8FAFC',
   },
   header: {
     flexDirection: 'row',
@@ -365,33 +425,41 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: 16,
     paddingBottom: 12,
-    backgroundColor: Colors.surface,
+    backgroundColor: '#FFFFFF',
     borderBottomWidth: 1,
-    borderBottomColor: Colors.borderSubtle,
+    borderBottomColor: '#E2E8F0',
   },
   backBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: Colors.surfaceElevated,
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: '#F1F5F9',
     justifyContent: 'center',
     alignItems: 'center',
   },
   headerTitleWrap: {
     flex: 1,
     alignItems: 'center',
-    paddingHorizontal: 10,
+    paddingHorizontal: 12,
   },
   headerCourseTitle: {
     fontSize: 12,
-    color: Colors.textMuted,
+    color: '#64748B',
     fontWeight: '600',
   },
   headerActivityTitle: {
     fontSize: 15,
     fontWeight: '800',
-    color: Colors.textMain,
+    color: '#0F172A',
     marginTop: 2,
+  },
+  headerRightBadge: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: '#ECFEFF',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   centerBox: {
     flex: 1,
@@ -402,13 +470,13 @@ const styles = StyleSheet.create({
   loadingText: {
     marginTop: 12,
     fontSize: 14,
-    color: Colors.textMuted,
+    color: '#64748B',
   },
   emptyIconCircle: {
-    width: 70,
-    height: 70,
-    borderRadius: 35,
-    backgroundColor: Colors.surfaceElevated,
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    backgroundColor: '#F1F5F9',
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 16,
@@ -416,111 +484,169 @@ const styles = StyleSheet.create({
   emptyTitle: {
     fontSize: 18,
     fontWeight: '800',
-    color: Colors.textMain,
+    color: '#0F172A',
     marginBottom: 8,
   },
   emptyDesc: {
     fontSize: 14,
-    color: Colors.textMuted,
+    color: '#64748B',
     textAlign: 'center',
     lineHeight: 22,
   },
   infoPill: {
     marginTop: 16,
-    fontSize: 12,
+    backgroundColor: '#ECFEFF',
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#A5F3FC',
+  },
+  infoPillText: {
+    fontSize: 13,
     fontWeight: '700',
     color: Colors.signal,
-    backgroundColor: 'rgba(2, 132, 199, 0.08)',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 8,
   },
   stepperContainer: {
     flex: 1,
   },
-  progressRow: {
+  progressSection: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 20,
     paddingVertical: 12,
-    backgroundColor: Colors.surface,
-    gap: 12,
+    backgroundColor: '#FFFFFF',
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
+    gap: 14,
   },
-  progressBarBg: {
+  progressBarWrapper: {
     flex: 1,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: Colors.surfaceElevated,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#E2E8F0',
     overflow: 'hidden',
   },
   progressBarFill: {
     height: '100%',
     backgroundColor: Colors.signal,
-    borderRadius: 3,
+    borderRadius: 4,
   },
-  progressText: {
+  progressCounterBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F1F5F9',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  progressCounterCurrent: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: Colors.signal,
+  },
+  progressCounterDivider: {
     fontSize: 12,
-    fontWeight: '700',
-    color: Colors.textMuted,
+    color: '#94A3B8',
+    marginHorizontal: 3,
+  },
+  progressCounterTotal: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#64748B',
   },
   questionScrollView: {
     flex: 1,
   },
   questionContent: {
-    padding: 20,
+    padding: 18,
     paddingBottom: 40,
-  },
-  questionCard: {
-    backgroundColor: Colors.surface,
-    borderRadius: 16,
-    padding: 20,
-    borderWidth: 1,
-    borderColor: Colors.borderSubtle,
-    marginBottom: 20,
   },
   instructionsBanner: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-    backgroundColor: 'rgba(2, 132, 199, 0.08)',
+    backgroundColor: '#F0FDFA',
+    borderWidth: 1,
+    borderColor: '#CCFBF1',
+    borderRadius: 12,
     paddingHorizontal: 14,
     paddingVertical: 10,
-    borderRadius: 12,
     marginBottom: 16,
+    gap: 10,
+  },
+  instructionsIconCircle: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    backgroundColor: '#CCFBF1',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   instructionsText: {
     flex: 1,
     fontSize: 13,
-    color: Colors.signal,
+    color: '#0F766E',
     fontWeight: '500',
     lineHeight: 18,
   },
-  questionCardHeader: {
+  questionCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 18,
+    padding: 20,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    marginBottom: 18,
+  },
+  questionCardTop: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 8,
+    marginBottom: 12,
   },
-  passThresholdBadge: {
+  questionTag: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    backgroundColor: '#ECFEFF',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 6,
+  },
+  questionTagText: {
     fontSize: 11,
-    fontWeight: '700',
-    color: Colors.emerald,
-    backgroundColor: 'rgba(16, 185, 129, 0.1)',
+    fontWeight: '800',
+    color: Colors.signal,
+    letterSpacing: 0.6,
+  },
+  passBadge: {
+    backgroundColor: '#ECFDF5',
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#A7F3D0',
   },
-  questionNumberText: {
-    fontSize: 12,
+  passBadgeText: {
+    fontSize: 11,
     fontWeight: '700',
-    color: Colors.signal,
-    textTransform: 'uppercase',
+    color: '#059669',
   },
   questionPrompt: {
-    fontSize: 17,
-    fontWeight: '700',
-    color: Colors.textMain,
+    fontSize: 18,
+    fontWeight: '800',
+    color: '#0F172A',
     lineHeight: 26,
+  },
+  optionsHeaderRow: {
+    marginBottom: 10,
+    paddingHorizontal: 2,
+  },
+  optionsSectionTitle: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#64748B',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
   optionsList: {
     gap: 12,
@@ -528,97 +654,152 @@ const styles = StyleSheet.create({
   optionCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: Colors.surface,
-    borderRadius: 14,
-    padding: 16,
+    borderRadius: 16,
+    paddingVertical: 15,
+    paddingHorizontal: 16,
+  },
+  optionCardDefault: {
+    backgroundColor: '#FFFFFF',
     borderWidth: 1.5,
-    borderColor: Colors.borderSubtle,
+    borderColor: '#E2E8F0',
+    elevation: 1,
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 4,
   },
   optionCardSelected: {
-    borderColor: Colors.signal,
-    backgroundColor: 'rgba(2, 132, 199, 0.04)',
+    backgroundColor: '#ECFEFF', // Clean, crisp light cyan tint
+    borderWidth: 2,
+    borderColor: Colors.signal, // Signature deep cyan border
+    elevation: 2,
+    shadowColor: Colors.signal,
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.12,
+    shadowRadius: 6,
   },
-  optionLetterBadge: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: Colors.surfaceElevated,
+  letterBadge: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 14,
   },
-  optionLetterBadgeSelected: {
+  letterBadgeDefault: {
+    backgroundColor: '#F1F5F9',
+  },
+  letterBadgeSelected: {
     backgroundColor: Colors.signal,
   },
-  optionLetterText: {
+  letterBadgeText: {
     fontSize: 14,
-    fontWeight: '700',
-    color: Colors.textMain,
+    fontWeight: '800',
   },
-  optionLetterTextSelected: {
+  letterBadgeTextDefault: {
+    color: '#475569',
+  },
+  letterBadgeTextSelected: {
     color: '#FFFFFF',
   },
-  optionTitle: {
+  optionText: {
     flex: 1,
-    fontSize: 15,
-    color: Colors.textMain,
-    fontWeight: '500',
+    fontSize: 16,
     lineHeight: 22,
+    marginRight: 10,
   },
-  optionTitleSelected: {
-    color: Colors.signal,
+  optionTextDefault: {
+    color: '#1E293B',
+    fontWeight: '500',
+  },
+  optionTextSelected: {
+    color: '#0F172A',
     fontWeight: '700',
+  },
+  radioIndicator: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  radioIndicatorDefault: {
+    borderWidth: 2,
+    borderColor: '#CBD5E1',
+    backgroundColor: '#FFFFFF',
+  },
+  radioIndicatorSelected: {
+    backgroundColor: Colors.signal,
   },
   footer: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: Colors.surface,
-    paddingHorizontal: 20,
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 18,
     paddingTop: 12,
     borderTopWidth: 1,
-    borderTopColor: Colors.borderSubtle,
+    borderTopColor: '#E2E8F0',
   },
-  stepNavBtn: {
+  prevBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    paddingVertical: 10,
+    paddingVertical: 12,
     paddingHorizontal: 16,
-    borderRadius: 10,
-    backgroundColor: Colors.surfaceElevated,
+    borderRadius: 12,
+    backgroundColor: '#F1F5F9',
   },
-  stepNavBtnText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: Colors.textMain,
+  prevBtnDisabled: {
+    opacity: 0.45,
   },
-  stepNextBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingVertical: 10,
-    paddingHorizontal: 20,
-    borderRadius: 10,
-    backgroundColor: Colors.signal,
-  },
-  stepNextBtnText: {
+  prevBtnText: {
     fontSize: 14,
     fontWeight: '700',
+    color: '#0F172A',
+  },
+  prevBtnTextDisabled: {
+    color: '#94A3B8',
+  },
+  nextBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingVertical: 12,
+    paddingHorizontal: 22,
+    borderRadius: 12,
+    backgroundColor: Colors.signal,
+    elevation: 2,
+    shadowColor: Colors.signal,
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.2,
+    shadowRadius: 5,
+  },
+  nextBtnPending: {
+    opacity: 0.88,
+  },
+  nextBtnText: {
+    fontSize: 14,
+    fontWeight: '800',
     color: '#FFFFFF',
   },
   submitBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    paddingVertical: 10,
-    paddingHorizontal: 20,
-    borderRadius: 10,
-    backgroundColor: Colors.emerald,
+    paddingVertical: 12,
+    paddingHorizontal: 22,
+    borderRadius: 12,
+    backgroundColor: '#059669',
+    elevation: 2,
+    shadowColor: '#059669',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.25,
+    shadowRadius: 5,
   },
   submitBtnText: {
     fontSize: 14,
-    fontWeight: '700',
+    fontWeight: '800',
     color: '#FFFFFF',
   },
   resultContainer: {
@@ -627,59 +808,70 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   resultCard: {
-    backgroundColor: Colors.surface,
-    borderRadius: 20,
-    padding: 24,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 24,
+    padding: 26,
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: Colors.borderSubtle,
+    borderColor: '#E2E8F0',
   },
   resultIconCircle: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
+    width: 84,
+    height: 84,
+    borderRadius: 42,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: 18,
   },
   resultTitle: {
     fontSize: 22,
-    fontWeight: '800',
-    color: Colors.textMain,
+    fontWeight: '900',
+    color: '#0F172A',
     marginBottom: 8,
   },
   resultMessage: {
     fontSize: 14,
-    color: Colors.textMuted,
+    color: '#64748B',
     textAlign: 'center',
     lineHeight: 22,
-    marginBottom: 20,
+    marginBottom: 22,
   },
   scoreBox: {
     alignItems: 'center',
-    backgroundColor: Colors.surfaceElevated,
-    paddingVertical: 16,
+    backgroundColor: '#F8FAFC',
+    paddingVertical: 18,
     paddingHorizontal: 30,
-    borderRadius: 14,
+    borderRadius: 16,
     width: '100%',
     marginBottom: 24,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
   },
   scoreLabel: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: Colors.textMuted,
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#64748B',
     textTransform: 'uppercase',
+    letterSpacing: 0.8,
   },
   scoreValue: {
-    fontSize: 32,
+    fontSize: 36,
     fontWeight: '900',
-    color: Colors.signal,
     marginTop: 4,
+  },
+  passingPill: {
+    marginTop: 8,
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
   },
   scoreSub: {
     fontSize: 12,
-    color: Colors.textMuted,
-    marginTop: 4,
+    fontWeight: '600',
+    color: '#475569',
   },
   returnBtn: {
     flexDirection: 'row',
