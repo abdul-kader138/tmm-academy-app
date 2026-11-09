@@ -20,6 +20,7 @@ import { Colors, cardShadow } from '../theme/colors';
 import { lmsApi, API_BASE_URL } from '../api/lmsApi';
 import { CourseCatalogItem, CourseDetail } from '../api/types';
 import { useAuth } from '../context/AuthContext';
+import { getCoursePricing } from '../utils/pricing';
 
 export const CourseDetailScreen: React.FC<{ route: any; navigation: any }> = ({
   route,
@@ -51,20 +52,7 @@ export const CourseDetailScreen: React.FC<{ route: any; navigation: any }> = ({
       : `${API_BASE_URL}${course.cover_image_url}`
     : '';
 
-  const priceInfo = (() => {
-    if (course.is_free === true) return { isFree: true, label: 'FREE' };
-    if (typeof course.price_cents === 'number') {
-      if (course.price_cents === 0) return { isFree: true, label: 'FREE' };
-      const euros = course.price_cents / 100;
-      return { isFree: false, label: euros % 1 === 0 ? `€${euros}` : `€${euros.toFixed(2)}` };
-    }
-    if (typeof course.price === 'number') {
-      if (course.price === 0) return { isFree: true, label: 'FREE' };
-      return { isFree: false, label: `€${course.price}` };
-    }
-    if (course.price_formatted) return { isFree: false, label: course.price_formatted };
-    return { isFree: true, label: 'FREE' };
-  })();
+  const pricing = getCoursePricing(course as any);
 
   const handleEnroll = async () => {
     if (!user) {
@@ -72,7 +60,7 @@ export const CourseDetailScreen: React.FC<{ route: any; navigation: any }> = ({
       return;
     }
 
-    if (priceInfo.isFree) {
+    if (pricing.isFree) {
       setEnrolling(true);
       try {
         const res = await lmsApi.enrollCourse(course.slug);
@@ -89,9 +77,13 @@ export const CourseDetailScreen: React.FC<{ route: any; navigation: any }> = ({
         setEnrolling(false);
       }
     } else {
+      const priceText = pricing.hasDiscount && pricing.originalPrice
+        ? `${pricing.displayPrice} (Save ${pricing.discountBadgeText})`
+        : pricing.displayPrice;
+
       Alert.alert(
         'Enroll in Course',
-        `Ready to enroll in "${course.title}" for ${priceInfo.label}?`,
+        `Ready to enroll in "${course.title}" for ${priceText}?`,
         [
           { text: 'Cancel', style: 'cancel' },
           {
@@ -201,19 +193,30 @@ export const CourseDetailScreen: React.FC<{ route: any; navigation: any }> = ({
           <View style={styles.vDivider} />
           <View style={styles.statCol}>
             <Ionicons
-              name={priceInfo.isFree ? 'gift-outline' : 'pricetag-outline'}
+              name={pricing.isFree ? 'gift-outline' : 'pricetag-outline'}
               size={17}
-              color={priceInfo.isFree ? Colors.emerald : '#0284C7'}
+              color={pricing.isFree ? Colors.emerald : '#0284C7'}
             />
-            <Text
-              style={[
-                styles.statVal,
-                { color: priceInfo.isFree ? Colors.emerald : '#0284C7' },
-              ]}
-            >
-              {priceInfo.label}
+            {pricing.hasDiscount ? (
+              <View style={{ alignItems: 'center' }}>
+                <Text style={styles.strikeDetailPrice}>{pricing.originalPrice}</Text>
+                <Text style={[styles.statVal, { color: '#DC2626' }]}>
+                  {pricing.displayPrice}
+                </Text>
+              </View>
+            ) : (
+              <Text
+                style={[
+                  styles.statVal,
+                  { color: pricing.isFree ? Colors.emerald : '#0284C7' },
+                ]}
+              >
+                {pricing.displayPrice}
+              </Text>
+            )}
+            <Text style={styles.statLbl}>
+              {pricing.hasDiscount ? pricing.discountBadgeText : 'Course Fee'}
             </Text>
-            <Text style={styles.statLbl}>Course Fee</Text>
           </View>
           <View style={styles.vDivider} />
           <View style={styles.statCol}>
@@ -423,7 +426,7 @@ export const CourseDetailScreen: React.FC<{ route: any; navigation: any }> = ({
                   ? '#D97706'
                   : course.is_enrolled
                   ? Colors.emerald
-                  : priceInfo.isFree
+                  : pricing.isFree
                   ? Colors.emerald
                   : '#0F172A',
               },
@@ -433,9 +436,11 @@ export const CourseDetailScreen: React.FC<{ route: any; navigation: any }> = ({
               ? 'Completed'
               : course.is_enrolled
               ? 'Enrolled'
-              : priceInfo.isFree
+              : pricing.isFree
               ? 'Free Access'
-              : priceInfo.label}
+              : pricing.hasDiscount
+              ? `${pricing.displayPrice} (${pricing.discountBadgeText})`
+              : pricing.displayPrice}
           </Text>
         </View>
 
@@ -446,7 +451,7 @@ export const CourseDetailScreen: React.FC<{ route: any; navigation: any }> = ({
               ? { backgroundColor: '#059669' }
               : course.is_enrolled
               ? { backgroundColor: Colors.signal }
-              : priceInfo.isFree
+              : pricing.isFree
               ? { backgroundColor: '#059669' }
               : { backgroundColor: Colors.signal },
           ]}
@@ -495,9 +500,11 @@ export const CourseDetailScreen: React.FC<{ route: any; navigation: any }> = ({
                   ? 'Go to Classroom'
                   : !user
                   ? 'Sign In to Enroll'
-                  : priceInfo.isFree
+                  : pricing.isFree
                   ? 'Enroll for Free'
-                  : `Enroll • ${priceInfo.label}`}
+                  : pricing.hasDiscount
+                  ? `Enroll • ${pricing.displayPrice} (${pricing.discountBadgeText})`
+                  : `Enroll • ${pricing.displayPrice}`}
               </Text>
               <Ionicons
                 name={course.access_expired ? 'ribbon' : 'arrow-forward'}
@@ -600,6 +607,12 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '700',
     marginTop: 4,
+  },
+  strikeDetailPrice: {
+    fontSize: 10,
+    color: '#94A3B8',
+    textDecorationLine: 'line-through',
+    fontWeight: '600',
   },
   statLbl: {
     color: Colors.textSecondary,

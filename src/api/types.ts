@@ -68,10 +68,15 @@ export interface CourseCatalogItem {
   created_at: string;
   is_free?: boolean;
   price_cents?: number | null;
+  discount_price_cents?: number | null;
+  display_price_cents?: number | null;
+  has_discount?: boolean;
   price?: number | null;
   currency?: string;
   price_formatted?: string;
   original_price?: number | null;
+  description_html?: string;
+  description_text?: string;
   checkout_url?: string | null;
   live_sessions?: any[];
   has_access?: boolean;

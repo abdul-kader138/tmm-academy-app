@@ -8,6 +8,7 @@ import {
   ActivityIndicator,
   Platform,
   Alert,
+  TextInput,
 } from 'react-native';
 import { WebView } from 'react-native-webview';
 import { Ionicons } from '@expo/vector-icons';
@@ -52,6 +53,9 @@ export const LessonPlayerScreen: React.FC<{ route: any; navigation: any }> = ({
   const [completing, setCompleting] = useState(false);
   const [isCompleted, setIsCompleted] = useState(false);
   const [downloadingAttachmentId, setDownloadingAttachmentId] = useState<number | string | null>(null);
+  const [comments, setComments] = useState<any[]>([]);
+  const [newCommentText, setNewCommentText] = useState('');
+  const [postingComment, setPostingComment] = useState(false);
 
   // Load course details
   useEffect(() => {
@@ -76,12 +80,34 @@ export const LessonPlayerScreen: React.FC<{ route: any; navigation: any }> = ({
       const data = await lmsApi.getLesson(courseSlug, id);
       setLesson(data);
       setIsCompleted(Boolean(data?.is_completed || data?.completed));
+      setComments(Array.isArray((data as any)?.comments) ? (data as any).comments : []);
     } catch {
       setLesson(null);
+      setComments([]);
     } finally {
       setLoadingLesson(false);
     }
   }, [courseSlug]);
+
+  const handlePostComment = async () => {
+    const trimmed = newCommentText.trim();
+    if (!trimmed || !courseSlug || !currentLessonId) return;
+
+    setPostingComment(true);
+    try {
+      const res = await lmsApi.postLessonComment(courseSlug, currentLessonId, trimmed);
+      if (res.success && res.data) {
+        setComments((prev) => [res.data, ...prev]);
+        setNewCommentText('');
+      } else {
+        Alert.alert('Notice', res.error || 'Could not post comment.');
+      }
+    } catch {
+      Alert.alert('Error', 'An unexpected error occurred while posting your comment.');
+    } finally {
+      setPostingComment(false);
+    }
+  };
 
   useEffect(() => {
     if (currentLessonId) {
@@ -552,6 +578,99 @@ export const LessonPlayerScreen: React.FC<{ route: any; navigation: any }> = ({
           )}
         </View>
 
+        {/* Lesson Discussion & Questions Section */}
+        <View style={[styles.discussionSection, cardShadow(1)]}>
+          <View style={styles.discussionHeader}>
+            <View style={styles.discussionHeaderLeft}>
+              <Ionicons name="chatbubbles" size={18} color={Colors.signal} />
+              <Text style={styles.discussionTitle}>Lesson Discussion</Text>
+            </View>
+            <View style={styles.commentCountBadge}>
+              <Text style={styles.commentCountText}>{comments.length}</Text>
+            </View>
+          </View>
+
+          {/* Comment Composer */}
+          <View style={styles.commentComposerRow}>
+            <TextInput
+              style={styles.commentInput}
+              placeholder="Ask a question about this lesson..."
+              placeholderTextColor="#94A3B8"
+              value={newCommentText}
+              onChangeText={setNewCommentText}
+              multiline
+              maxLength={1000}
+            />
+            <TouchableOpacity
+              style={[
+                styles.postCommentBtn,
+                (!newCommentText.trim() || postingComment) && styles.postCommentBtnDisabled,
+              ]}
+              onPress={handlePostComment}
+              disabled={!newCommentText.trim() || postingComment}
+              activeOpacity={0.8}
+            >
+              {postingComment ? (
+                <ActivityIndicator size="small" color="#FFFFFF" />
+              ) : (
+                <Ionicons name="send" size={15} color="#FFFFFF" />
+              )}
+            </TouchableOpacity>
+          </View>
+
+          {/* Comments List */}
+          {comments.length === 0 ? (
+            <View style={styles.emptyCommentsBox}>
+              <Ionicons name="chatbubble-ellipses-outline" size={26} color="#94A3B8" />
+              <Text style={styles.emptyCommentsText}>
+                No questions or discussions yet. Have a question? Ask above!
+              </Text>
+            </View>
+          ) : (
+            <View style={styles.commentsList}>
+              {comments.map((c, cIdx) => {
+                const authorName = c.user?.name || c.author_name || (c.user_id === user?.id ? user?.name : 'Learner');
+                const initial = (authorName || 'U').charAt(0).toUpperCase();
+                const isInstructor = Boolean(c.is_instructor || c.user?.is_instructor);
+
+                return (
+                  <View key={c.id || cIdx} style={styles.commentItem}>
+                    <View style={styles.commentAvatar}>
+                      <Text style={styles.commentAvatarText}>{initial}</Text>
+                    </View>
+                    <View style={styles.commentBodyCol}>
+                      <View style={styles.commentAuthorRow}>
+                        <Text style={styles.commentAuthorName}>{authorName}</Text>
+                        {isInstructor && (
+                          <View style={styles.instructorBadge}>
+                            <Text style={styles.instructorBadgeText}>Instructor</Text>
+                          </View>
+                        )}
+                      </View>
+                      <Text style={styles.commentBodyText}>{c.body || c.comment || c.message || ''}</Text>
+
+                      {/* Nested Replies */}
+                      {c.replies && Array.isArray(c.replies) && c.replies.length > 0 && (
+                        <View style={styles.repliesList}>
+                          {c.replies.map((r: any, rIdx: number) => {
+                            const rAuthor = r.user?.name || r.author_name || 'Instructor';
+                            return (
+                              <View key={r.id || rIdx} style={styles.replyItem}>
+                                <Text style={styles.replyAuthor}>{rAuthor}:</Text>
+                                <Text style={styles.replyBody}>{r.body || r.comment || ''}</Text>
+                              </View>
+                            );
+                          })}
+                        </View>
+                      )}
+                    </View>
+                  </View>
+                );
+              })}
+            </View>
+          )}
+        </View>
+
         {/* Course Curriculum Drawer / List */}
         {courseDetail?.sections && courseDetail.sections.length > 0 ? (
           <View style={styles.syllabusSection}>
@@ -931,6 +1050,159 @@ const styles = StyleSheet.create({
   },
   syllabusSection: {
     marginTop: 4,
+  },
+  discussionSection: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    marginBottom: 16,
+  },
+  discussionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 12,
+  },
+  discussionHeaderLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  discussionTitle: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: '#0F172A',
+  },
+  commentCountBadge: {
+    backgroundColor: '#ECFEFF',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#A5F3FC',
+  },
+  commentCountText: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: Colors.signal,
+  },
+  commentComposerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 14,
+  },
+  commentInput: {
+    flex: 1,
+    backgroundColor: '#F8FAFC',
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: 13,
+    color: '#0F172A',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    maxHeight: 80,
+  },
+  postCommentBtn: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: Colors.signal,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  postCommentBtnDisabled: {
+    opacity: 0.5,
+  },
+  emptyCommentsBox: {
+    alignItems: 'center',
+    paddingVertical: 18,
+    paddingHorizontal: 12,
+  },
+  emptyCommentsText: {
+    fontSize: 12,
+    color: '#94A3B8',
+    textAlign: 'center',
+    marginTop: 6,
+    lineHeight: 18,
+  },
+  commentsList: {
+    gap: 12,
+  },
+  commentItem: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 10,
+    paddingTop: 10,
+    borderTopWidth: 1,
+    borderTopColor: '#F1F5F9',
+  },
+  commentAvatar: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#0E7490',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  commentAvatarText: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  commentBodyCol: {
+    flex: 1,
+  },
+  commentAuthorRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 2,
+  },
+  commentAuthorName: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#0F172A',
+  },
+  instructorBadge: {
+    backgroundColor: '#ECFDF5',
+    paddingHorizontal: 6,
+    paddingVertical: 1,
+    borderRadius: 4,
+  },
+  instructorBadgeText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#059669',
+  },
+  commentBodyText: {
+    fontSize: 13,
+    color: '#334155',
+    lineHeight: 19,
+  },
+  repliesList: {
+    marginTop: 8,
+    paddingLeft: 10,
+    borderLeftWidth: 2,
+    borderLeftColor: '#E2E8F0',
+    gap: 6,
+  },
+  replyItem: {
+    flexDirection: 'row',
+    gap: 4,
+  },
+  replyAuthor: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#0E7490',
+  },
+  replyBody: {
+    fontSize: 11,
+    color: '#475569',
+    flex: 1,
   },
   syllabusHeading: {
     fontSize: 16,

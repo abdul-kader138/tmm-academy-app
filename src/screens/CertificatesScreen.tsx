@@ -24,16 +24,40 @@ export const CertificatesScreen: React.FC<{ navigation?: any }> = ({ navigation 
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
   const [certificates, setCertificates] = useState<CertificateItem[]>([]);
+  const [pendingApprovalCourses, setPendingApprovalCourses] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [downloadingId, setDownloadingId] = useState<number | null>(null);
 
   const fetchCertificates = useCallback(async (isSilent = false) => {
     if (!isSilent) setLoading(true);
     try {
-      const certs = await lmsApi.getCertificates();
+      const [certs, dash] = await Promise.all([
+        lmsApi.getCertificates().catch(() => []),
+        lmsApi.getDashboard().catch(() => null),
+      ]);
+
       setCertificates(certs);
+
+      if (dash?.enrolled_courses && Array.isArray(dash.enrolled_courses)) {
+        const certCourseTitles = new Set(
+          certs.map((c: CertificateItem) => c.course_title?.toLowerCase().trim())
+        );
+
+        const pending = dash.enrolled_courses.filter((c: any) => {
+          const isCompleted =
+            (typeof c.progress_percent === 'number' && c.progress_percent >= 100) ||
+            Boolean(c.is_completed || c.completed || c.access_expired);
+          const hasIssuedCert = certCourseTitles.has(c.title?.toLowerCase().trim());
+          return isCompleted && !hasIssuedCert;
+        });
+
+        setPendingApprovalCourses(pending);
+      } else {
+        setPendingApprovalCourses([]);
+      }
     } catch {
       setCertificates([]);
+      setPendingApprovalCourses([]);
     } finally {
       setLoading(false);
     }
@@ -214,26 +238,66 @@ export const CertificatesScreen: React.FC<{ navigation?: any }> = ({ navigation 
             styles.listContent,
             { paddingBottom: insets.bottom + 80 },
           ]}
-          ListEmptyComponent={
-            <View style={[styles.emptyCard, cardShadow(1)]}>
-              <View style={styles.emptyIconCircle}>
-                <Ionicons name="ribbon-outline" size={40} color={Colors.textMuted} />
+          ListHeaderComponent={
+            pendingApprovalCourses.length > 0 ? (
+              <View style={styles.pendingSection}>
+                <View style={styles.pendingHeaderRow}>
+                  <Ionicons name="time" size={16} color="#D97706" />
+                  <Text style={styles.pendingSectionTitle}>Awaiting Admin Approval</Text>
+                </View>
+                <Text style={styles.pendingSectionDesc}>
+                  Your course completion has been registered. Official credentials will become downloadable once verified and issued by administration.
+                </Text>
+                <View style={{ gap: 10, marginTop: 10, marginBottom: certificates.length > 0 ? 16 : 4 }}>
+                  {pendingApprovalCourses.map((c, idx) => (
+                    <View key={c.id || idx} style={[styles.pendingCard, cardShadow(1)]}>
+                      <View style={styles.pendingBadgeCircle}>
+                        <Ionicons name="hourglass-outline" size={22} color="#D97706" />
+                      </View>
+                      <View style={styles.certBody}>
+                        <Text style={styles.courseTitle}>{c.title}</Text>
+                        <View style={styles.pendingStatusPill}>
+                          <Text style={styles.pendingStatusText}>In Review by Administration</Text>
+                        </View>
+                      </View>
+                      <View style={styles.lockedBtn}>
+                        <Ionicons name="lock-closed" size={13} color="#94A3B8" />
+                        <Text style={styles.lockedBtnText}>Locked</Text>
+                      </View>
+                    </View>
+                  ))}
+                </View>
+                {certificates.length > 0 && (
+                  <View style={styles.verifiedHeaderRow}>
+                    <Ionicons name="shield-checkmark" size={16} color={Colors.emerald} />
+                    <Text style={styles.verifiedSectionTitle}>Issued & Verified Certificates</Text>
+                  </View>
+                )}
               </View>
-              <Text style={styles.emptyTitle}>No Certificates Yet</Text>
-              <Text style={styles.emptyDesc}>
-                Complete all course curriculum lessons and exercises to earn your verified certificates.
-              </Text>
-              {navigation && (
-                <TouchableOpacity
-                  style={styles.browseBtn}
-                  onPress={() => navigation.navigate('MainTabs', { screen: 'CatalogTab' })}
-                  activeOpacity={0.85}
-                >
-                  <Text style={styles.browseBtnText}>Explore Courses</Text>
-                  <Ionicons name="arrow-forward" size={16} color="#FFFFFF" />
-                </TouchableOpacity>
-              )}
-            </View>
+            ) : undefined
+          }
+          ListEmptyComponent={
+            pendingApprovalCourses.length === 0 ? (
+              <View style={[styles.emptyCard, cardShadow(1)]}>
+                <View style={styles.emptyIconCircle}>
+                  <Ionicons name="ribbon-outline" size={40} color={Colors.textMuted} />
+                </View>
+                <Text style={styles.emptyTitle}>No Certificates Yet</Text>
+                <Text style={styles.emptyDesc}>
+                  Complete all course curriculum lessons and exercises to earn your verified certificates.
+                </Text>
+                {navigation && (
+                  <TouchableOpacity
+                    style={styles.browseBtn}
+                    onPress={() => navigation.navigate('MainTabs', { screen: 'CatalogTab' })}
+                    activeOpacity={0.85}
+                  >
+                    <Text style={styles.browseBtnText}>Explore Courses</Text>
+                    <Ionicons name="arrow-forward" size={16} color="#FFFFFF" />
+                  </TouchableOpacity>
+                )}
+              </View>
+            ) : undefined
           }
         />
       )}
@@ -285,6 +349,87 @@ const styles = StyleSheet.create({
     padding: 16,
     borderWidth: 1,
     borderColor: Colors.borderSubtle,
+  },
+  pendingSection: {
+    marginBottom: 16,
+  },
+  pendingHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 4,
+  },
+  pendingSectionTitle: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: '#D97706',
+    letterSpacing: 0.3,
+  },
+  pendingSectionDesc: {
+    fontSize: 12,
+    color: Colors.textSecondary,
+    lineHeight: 18,
+    marginBottom: 6,
+  },
+  pendingCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFFBEB',
+    borderRadius: 14,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: '#FDE68A',
+  },
+  pendingBadgeCircle: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    backgroundColor: '#FEF3C7',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  pendingStatusPill: {
+    alignSelf: 'flex-start',
+    backgroundColor: '#FEF3C7',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 6,
+    marginTop: 4,
+  },
+  pendingStatusText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#B45309',
+  },
+  lockedBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#F1F5F9',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  lockedBtnText: {
+    color: '#64748B',
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  verifiedHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 10,
+    marginTop: 8,
+  },
+  verifiedSectionTitle: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: '#059669',
+    letterSpacing: 0.3,
   },
   ribbonBadge: {
     width: 46,

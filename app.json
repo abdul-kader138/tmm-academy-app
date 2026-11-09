@@ -49,6 +49,14 @@
       "expo-asset",
       "expo-font",
       "expo-status-bar"
-    ]
+    ],
+    "extra": {
+      "expo-navigation-bar": {
+        "enforceContrast": false
+      },
+      "eas": {
+        "projectId": "b6c28df7-058b-47b1-9d61-73789f7dc05d"
+      }
+    }
   }
 }

@@ -17,6 +17,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import { Colors, cardShadow } from '../theme/colors';
 import { lmsApi, API_BASE_URL } from '../api/lmsApi';
 import { CourseCatalogItem } from '../api/types';
+import { getCoursePricing } from '../utils/pricing';
 
 export const CourseCatalogScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   const insets = useSafeAreaInsets();
@@ -61,21 +62,7 @@ export const CourseCatalogScreen: React.FC<{ navigation: any }> = ({ navigation 
       : `${API_BASE_URL}${item.cover_image_url}`;
 
     const durationHours = Math.round(item.duration_minutes / 60);
-
-    const priceInfo = (() => {
-      if (item.is_free === true) return { isFree: true, label: 'FREE' };
-      if (typeof item.price_cents === 'number') {
-        if (item.price_cents === 0) return { isFree: true, label: 'FREE' };
-        const euros = item.price_cents / 100;
-        return { isFree: false, label: euros % 1 === 0 ? `€${euros}` : `€${euros.toFixed(2)}` };
-      }
-      if (typeof item.price === 'number') {
-        if (item.price === 0) return { isFree: true, label: 'FREE' };
-        return { isFree: false, label: `€${item.price}` };
-      }
-      if (item.price_formatted) return { isFree: false, label: item.price_formatted };
-      return { isFree: true, label: 'FREE' };
-    })();
+    const pricing = getCoursePricing(item);
 
     return (
       <TouchableOpacity
@@ -91,21 +78,37 @@ export const CourseCatalogScreen: React.FC<{ navigation: any }> = ({ navigation 
               resizeMode="cover"
             />
           )}
-          {/* Price Tag Overlay */}
+
+          {/* Discount Percentage Badge on Top Left */}
+          {pricing.hasDiscount && (
+            <View style={styles.discountBadgeOverlay}>
+              <Ionicons name="flash" size={11} color="#FFFFFF" />
+              <Text style={styles.discountBadgeText}>{pricing.discountBadgeText}</Text>
+            </View>
+          )}
+
+          {/* Price Tag Overlay on Top Right */}
           <View
             style={[
               styles.priceBadgeOverlay,
-              priceInfo.isFree ? styles.priceBadgeFree : styles.priceBadgePaid,
+              pricing.isFree ? styles.priceBadgeFree : styles.priceBadgePaid,
             ]}
           >
-            <Text
-              style={[
-                styles.priceBadgeText,
-                priceInfo.isFree ? styles.priceBadgeTextFree : styles.priceBadgeTextPaid,
-              ]}
-            >
-              {priceInfo.label}
-            </Text>
+            {pricing.hasDiscount && pricing.originalPrice ? (
+              <View style={styles.discountPriceRow}>
+                <Text style={styles.strikeOriginalPrice}>{pricing.originalPrice}</Text>
+                <Text style={styles.priceBadgeTextPaid}>{pricing.displayPrice}</Text>
+              </View>
+            ) : (
+              <Text
+                style={[
+                  styles.priceBadgeText,
+                  pricing.isFree ? styles.priceBadgeTextFree : styles.priceBadgeTextPaid,
+                ]}
+              >
+                {pricing.displayPrice}
+              </Text>
+            )}
           </View>
         </View>
 
@@ -117,19 +120,25 @@ export const CourseCatalogScreen: React.FC<{ navigation: any }> = ({ navigation 
               </View>
             ) : null}
 
+            {pricing.hasDiscount && (
+              <View style={styles.discountPill}>
+                <Text style={styles.discountPillText}>{pricing.discountBadgeText}</Text>
+              </View>
+            )}
+
             <View
               style={[
                 styles.priceInlinePill,
-                priceInfo.isFree ? styles.priceBadgeFree : styles.priceBadgePaid,
+                pricing.isFree ? styles.priceBadgeFree : styles.priceBadgePaid,
               ]}
             >
               <Text
                 style={[
                   styles.priceInlinePillText,
-                  priceInfo.isFree ? styles.priceBadgeTextFree : styles.priceBadgeTextPaid,
+                  pricing.isFree ? styles.priceBadgeTextFree : styles.priceBadgeTextPaid,
                 ]}
               >
-                {priceInfo.isFree ? 'Free Course' : priceInfo.label}
+                {pricing.isFree ? 'Free Course' : pricing.displayPrice}
               </Text>
             </View>
           </View>
@@ -162,7 +171,7 @@ export const CourseCatalogScreen: React.FC<{ navigation: any }> = ({ navigation 
                   { color: item.is_enrolled ? Colors.emerald : Colors.signal },
                 ]}
               >
-                {item.is_enrolled ? 'Enrolled' : priceInfo.isFree ? 'Free' : priceInfo.label}
+                {item.is_enrolled ? 'Enrolled' : pricing.isFree ? 'Free' : pricing.displayPrice}
               </Text>
             </View>
           </View>
@@ -315,6 +324,50 @@ const styles = StyleSheet.create({
   priceBadgePaid: {
     backgroundColor: 'rgba(15, 23, 42, 0.88)',
     borderColor: '#334155',
+  },
+  discountBadgeOverlay: {
+    position: 'absolute',
+    top: 10,
+    left: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    backgroundColor: '#DC2626',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#EF4444',
+  },
+  discountBadgeText: {
+    color: '#FFFFFF',
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 0.3,
+  },
+  discountPriceRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  strikeOriginalPrice: {
+    fontSize: 11,
+    color: '#94A3B8',
+    textDecorationLine: 'line-through',
+    fontWeight: '600',
+  },
+  discountPill: {
+    backgroundColor: '#FEF2F2',
+    borderColor: '#FECACA',
+    borderWidth: 1,
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  discountPillText: {
+    color: '#DC2626',
+    fontSize: 11,
+    fontWeight: '800',
   },
   priceBadgeText: {
     fontSize: 12,

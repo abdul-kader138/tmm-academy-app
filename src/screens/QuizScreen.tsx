@@ -221,21 +221,71 @@ export const QuizScreen: React.FC<{ route: any; navigation: any }> = ({ route, n
       ) : (
         /* Active Quiz Screen */
         <View style={styles.stepperContainer}>
-          {/* Creative Progress Bar */}
+          {/* Creative Progress Bar & Interactive Question Navigator */}
           <View style={styles.progressSection}>
-            <View style={styles.progressBarWrapper}>
-              <View
-                style={[
-                  styles.progressBarFill,
-                  { width: `${((currentIndex + 1) / totalQuestions) * 100}%` },
-                ]}
-              />
+            <View style={styles.progressHeaderRow}>
+              <View style={styles.progressBarWrapper}>
+                <View
+                  style={[
+                    styles.progressBarFill,
+                    { width: `${((currentIndex + 1) / totalQuestions) * 100}%` },
+                  ]}
+                />
+              </View>
+              <View style={styles.progressCounterBadge}>
+                <Text style={styles.progressCounterCurrent}>{currentIndex + 1}</Text>
+                <Text style={styles.progressCounterDivider}>/</Text>
+                <Text style={styles.progressCounterTotal}>{totalQuestions}</Text>
+              </View>
             </View>
-            <View style={styles.progressCounterBadge}>
-              <Text style={styles.progressCounterCurrent}>{currentIndex + 1}</Text>
-              <Text style={styles.progressCounterDivider}>/</Text>
-              <Text style={styles.progressCounterTotal}>{totalQuestions}</Text>
-            </View>
+
+            {/* Question Quick Jump Pills */}
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.questionPillsContainer}
+            >
+              {questions.map((_, qIdx) => {
+                const isAnswered = selectedAnswers[qIdx] !== undefined;
+                const isCurrent = qIdx === currentIndex;
+                return (
+                  <TouchableOpacity
+                    key={qIdx}
+                    onPress={() => setCurrentIndex(qIdx)}
+                    style={[
+                      styles.stepPill,
+                      isCurrent
+                        ? styles.stepPillActive
+                        : isAnswered
+                        ? styles.stepPillAnswered
+                        : styles.stepPillDefault,
+                    ]}
+                    activeOpacity={0.7}
+                  >
+                    <Text
+                      style={[
+                        styles.stepPillText,
+                        isCurrent
+                          ? styles.stepPillTextActive
+                          : isAnswered
+                          ? styles.stepPillTextAnswered
+                          : styles.stepPillTextDefault,
+                      ]}
+                    >
+                      Q{qIdx + 1}
+                    </Text>
+                    {isAnswered && (
+                      <Ionicons
+                        name="checkmark"
+                        size={12}
+                        color={isCurrent ? '#FFFFFF' : '#059669'}
+                        style={styles.stepPillCheck}
+                      />
+                    )}
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
           </View>
 
           <ScrollView
@@ -511,14 +561,18 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   progressSection: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 12,
     backgroundColor: '#FFFFFF',
     borderBottomWidth: 1,
     borderBottomColor: '#F1F5F9',
-    gap: 14,
+    paddingTop: 12,
+    paddingBottom: 10,
+    paddingHorizontal: 16,
+  },
+  progressHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginBottom: 10,
   },
   progressBarWrapper: {
     flex: 1,
@@ -554,6 +608,48 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '600',
     color: '#64748B',
+  },
+  questionPillsContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingVertical: 2,
+  },
+  stepPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+    borderWidth: 1.5,
+  },
+  stepPillDefault: {
+    backgroundColor: '#F8FAFC',
+    borderColor: '#E2E8F0',
+  },
+  stepPillActive: {
+    backgroundColor: Colors.signal,
+    borderColor: Colors.signal,
+  },
+  stepPillAnswered: {
+    backgroundColor: '#ECFDF5',
+    borderColor: '#A7F3D0',
+  },
+  stepPillText: {
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  stepPillTextDefault: {
+    color: '#64748B',
+  },
+  stepPillTextActive: {
+    color: '#FFFFFF',
+  },
+  stepPillTextAnswered: {
+    color: '#059669',
+  },
+  stepPillCheck: {
+    marginLeft: 3,
   },
   questionScrollView: {
     flex: 1,
@@ -655,28 +751,20 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     borderRadius: 16,
-    paddingVertical: 15,
+    paddingVertical: 14,
     paddingHorizontal: 16,
   },
   optionCardDefault: {
     backgroundColor: '#FFFFFF',
     borderWidth: 1.5,
     borderColor: '#E2E8F0',
-    elevation: 1,
-    shadowColor: '#0F172A',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.04,
-    shadowRadius: 4,
   },
   optionCardSelected: {
-    backgroundColor: '#ECFEFF', // Clean, crisp light cyan tint
+    backgroundColor: '#F0FDFA', // Crisp solid mint tint (no Android shadow box glitch)
     borderWidth: 2,
-    borderColor: Colors.signal, // Signature deep cyan border
-    elevation: 2,
-    shadowColor: Colors.signal,
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.12,
-    shadowRadius: 6,
+    borderColor: Colors.signal,
+    borderLeftWidth: 5,
+    borderLeftColor: Colors.signal,
   },
   letterBadge: {
     width: 36,

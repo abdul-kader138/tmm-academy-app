@@ -594,6 +594,26 @@ class LmsApiClient {
     });
   }
 
+  async postLessonComment(
+    courseSlug: string,
+    lessonIdOrSlug: string | number,
+    body: string,
+    parentId?: number | null
+  ): Promise<{ success: boolean; data?: any; error?: string }> {
+    await this.ensureCsrf();
+    const res = await this.request<any>(
+      `/api/v1/courses/${courseSlug}/lessons/${lessonIdOrSlug}/comments`,
+      {
+        method: 'POST',
+        body: JSON.stringify({ body, parent_id: parentId ?? null }),
+      }
+    );
+    if (res.error) {
+      return { success: false, error: res.error };
+    }
+    return { success: true, data: res.data?.comment || res.data };
+  }
+
   async getActivity(courseSlug: string, activityId: number | string): Promise<ActivityDetail | null> {
     const res = await this.request<any>(`/api/v1/courses/${courseSlug}/activities/${activityId}`);
     if (!res.data) return null;
