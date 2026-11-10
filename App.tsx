@@ -5,6 +5,7 @@ import { StatusBar } from 'expo-status-bar';
 import { NavigationBar } from 'expo-navigation-bar';
 import { AuthProvider } from './src/context/AuthContext';
 import { RootNavigator } from './src/navigation/RootNavigator';
+import { AppErrorBoundary } from './src/components/AppErrorBoundary';
 import { Colors } from './src/theme/colors';
 
 export default function App() {
@@ -15,9 +16,11 @@ export default function App() {
         {Platform.OS === 'android' && (
           <NavigationBar style="light" />
         )}
-        <AuthProvider>
-          <RootNavigator />
-        </AuthProvider>
+        <AppErrorBoundary>
+          <AuthProvider>
+            <RootNavigator />
+          </AuthProvider>
+        </AppErrorBoundary>
       </View>
     </SafeAreaProvider>
   );

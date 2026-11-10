@@ -46,13 +46,30 @@ export const DashboardScreen: React.FC<{ navigation: any }> = ({ navigation }) =
   // Automatically refresh whenever screen comes into focus
   useFocusEffect(
     useCallback(() => {
+      let isMounted = true;
       if (user) {
-        // If we already have dashboard data, refresh silently in the background
-        void fetchDashboard(Boolean(dashboard));
+        void (async () => {
+          try {
+            const res = await lmsApi.getDashboard();
+            if (isMounted && res) {
+              setDashboard(res);
+            }
+          } catch {
+            // ignore
+          } finally {
+            if (isMounted) {
+              setLoading(false);
+              setRefreshing(false);
+            }
+          }
+        })();
       } else {
         setLoading(false);
       }
-    }, [user, fetchDashboard, Boolean(dashboard)])
+      return () => {
+        isMounted = false;
+      };
+    }, [user])
   );
 
   const onRefresh = () => {

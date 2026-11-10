@@ -63,23 +63,36 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    let isMounted = true;
+    const safetyTimer = setTimeout(() => {
+      if (isMounted) setLoading(false);
+    }, 4000);
+
     void (async () => {
       try {
         await lmsApi.init();
         const token = lmsApi.getToken();
         console.log('[AuthContext] Full startup token:', token);
         if (token) {
-          const profile = await lmsApi.getAccount();
+          const profilePromise = lmsApi.getAccount();
+          const timeoutPromise = new Promise<null>((resolve) => setTimeout(() => resolve(null), 3500));
+          const profile = await Promise.race([profilePromise, timeoutPromise]);
           console.log('[AuthContext] Startup profile:', profile ? profile.email : 'NULL');
-          setUser(profile);
+          if (isMounted && profile) setUser(profile);
         }
       } catch (e) {
         console.error('[AuthContext] Startup error:', e);
-        setUser(null);
+        if (isMounted) setUser(null);
       } finally {
-        setLoading(false);
+        clearTimeout(safetyTimer);
+        if (isMounted) setLoading(false);
       }
     })();
+
+    return () => {
+      isMounted = false;
+      clearTimeout(safetyTimer);
+    };
   }, []);
 
   const login = async (payload: {

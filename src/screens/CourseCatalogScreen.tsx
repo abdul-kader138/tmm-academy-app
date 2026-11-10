@@ -54,9 +54,24 @@ export const CourseCatalogScreen: React.FC<{ navigation: any }> = ({ navigation 
 
   useFocusEffect(
     useCallback(() => {
-      // Refresh silently on focus so enrollments update immediately
-      void fetchCourses(courses.length > 0);
-    }, [fetchCourses, courses.length])
+      let isMounted = true;
+      void (async () => {
+        try {
+          const data = await lmsApi.getCourses();
+          if (isMounted) setCourses(data);
+        } catch {
+          if (isMounted) setCourses([]);
+        } finally {
+          if (isMounted) {
+            setLoading(false);
+            setRefreshing(false);
+          }
+        }
+      })();
+      return () => {
+        isMounted = false;
+      };
+    }, [])
   );
 
   const onRefresh = () => {
