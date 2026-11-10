@@ -16,6 +16,7 @@ import { StatusBar } from 'expo-status-bar';
 import { Colors, cardShadow } from '../theme/colors';
 import { lmsApi } from '../api/lmsApi';
 import { CourseCatalogItem, LiveClassItem } from '../api/types';
+import { cleanHtml } from '../utils/text';
 
 export const LiveClassesScreen: React.FC<{ navigation: any; route: any }> = ({
   navigation,
@@ -283,7 +284,7 @@ export const LiveClassesScreen: React.FC<{ navigation: any; route: any }> = ({
 
                   {item.description ? (
                     <Text style={styles.classDescription} numberOfLines={2}>
-                      {item.description}
+                      {cleanHtml(item.description)}
                     </Text>
                   ) : null}
 

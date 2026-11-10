@@ -21,6 +21,7 @@ import { Colors, cardShadow } from '../theme/colors';
 import { lmsApi, API_BASE_URL } from '../api/lmsApi';
 import { LessonDetail, CourseDetail, LessonAttachment } from '../api/types';
 import { useAuth } from '../context/AuthContext';
+import { cleanHtml } from '../utils/text';
 
 function extractYouTubeId(urlOrId?: string | null): string | null {
   if (!urlOrId) return null;
@@ -461,7 +462,7 @@ export const LessonPlayerScreen: React.FC<{ route: any; navigation: any }> = ({
           {lesson?.summary ? (
             <View style={styles.summaryBox}>
               <Text style={styles.summaryTitle}>Lesson Summary</Text>
-              <Text style={styles.summaryText}>{lesson.summary}</Text>
+              <Text style={styles.summaryText}>{cleanHtml(lesson.summary)}</Text>
             </View>
           ) : null}
         </View>

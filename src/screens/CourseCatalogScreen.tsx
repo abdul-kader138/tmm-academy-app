@@ -18,6 +18,7 @@ import { Colors, cardShadow } from '../theme/colors';
 import { lmsApi, API_BASE_URL } from '../api/lmsApi';
 import { CourseCatalogItem } from '../api/types';
 import { getCoursePricing } from '../utils/pricing';
+import { cleanHtml } from '../utils/text';
 
 export const CourseCatalogScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   const insets = useSafeAreaInsets();
@@ -148,7 +149,7 @@ export const CourseCatalogScreen: React.FC<{ navigation: any }> = ({ navigation 
           </Text>
 
           <Text style={styles.courseDesc} numberOfLines={3}>
-            {item.description}
+            {cleanHtml(item.description_text || item.description)}
           </Text>
 
           <View style={styles.cardFooter}>

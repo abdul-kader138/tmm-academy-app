@@ -21,6 +21,7 @@ import { lmsApi, API_BASE_URL } from '../api/lmsApi';
 import { CourseCatalogItem, CourseDetail } from '../api/types';
 import { useAuth } from '../context/AuthContext';
 import { getCoursePricing } from '../utils/pricing';
+import { cleanHtml } from '../utils/text';
 
 export const CourseDetailScreen: React.FC<{ route: any; navigation: any }> = ({
   route,
@@ -271,7 +272,9 @@ export const CourseDetailScreen: React.FC<{ route: any; navigation: any }> = ({
             </View>
           )}
 
-          <Text style={styles.descriptionText}>{course.description}</Text>
+          <Text style={styles.descriptionText}>
+            {cleanHtml(course.description_text || course.description)}
+          </Text>
 
           {/* Syllabus / Sections */}
           {loading ? (

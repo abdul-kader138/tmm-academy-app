@@ -15,6 +15,7 @@ import { StatusBar } from 'expo-status-bar';
 import { Colors, cardShadow } from '../theme/colors';
 import { lmsApi } from '../api/lmsApi';
 import { ActivityDetail } from '../api/types';
+import { cleanHtml } from '../utils/text';
 
 export const QuizScreen: React.FC<{ route: any; navigation: any }> = ({ route, navigation }) => {
   const insets = useSafeAreaInsets();
@@ -208,9 +209,11 @@ export const QuizScreen: React.FC<{ route: any; navigation: any }> = ({ route, n
           </View>
           <Text style={styles.emptyTitle}>Checkpoint Details</Text>
           <Text style={styles.emptyDesc}>
-            {activity?.instructions ||
-              activity?.description ||
-              'This checkpoint is managed by course instructors. No multiple-choice questions are required at this time.'}
+            {cleanHtml(
+              activity?.instructions ||
+                activity?.description ||
+                'This checkpoint is managed by course instructors. No multiple-choice questions are required at this time.'
+            )}
           </Text>
           {activity?.passing_score ? (
             <View style={styles.infoPill}>
@@ -299,7 +302,7 @@ export const QuizScreen: React.FC<{ route: any; navigation: any }> = ({ route, n
                 <View style={styles.instructionsIconCircle}>
                   <Ionicons name="bulb-outline" size={16} color={Colors.signal} />
                 </View>
-                <Text style={styles.instructionsText}>{activity.instructions}</Text>
+                <Text style={styles.instructionsText}>{cleanHtml(activity.instructions)}</Text>
               </View>
             ) : null}
 

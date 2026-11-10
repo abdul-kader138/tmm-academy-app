@@ -464,26 +464,46 @@ class LmsApiClient {
     console.log('[lmsApi] getCourseDetail status:', res.status, 'for slug:', courseSlug, 'error:', res.error);
     if (!res.data) {
       if (res.status === 403) {
-        const catalog = await this.getCourses().catch(() => []);
+        // Course content is restricted. Check if student is not enrolled or if enrollment expired.
+        const [catalog, dash] = await Promise.all([
+          this.getCourses().catch(() => []),
+          this.getDashboard().catch(() => null),
+        ]);
         const found = catalog.find((c) => c.slug === courseSlug);
+        const enrollment = dash?.enrolled_courses?.find(
+          (e: any) => e.slug === courseSlug || (found && e.id === found.id)
+        );
+
+        // Only mark access_expired if student actually had an enrollment that has expired
+        const isActuallyExpired = Boolean(
+          enrollment && (enrollment.has_access === false || (enrollment as any).access_expired)
+        );
+        const isActuallyEnrolled = Boolean(enrollment && enrollment.has_access);
+
         return {
           id: found?.id || 0,
           slug: courseSlug,
           title: found?.title || 'Course Details',
           description: found?.description || '',
+          description_text: found?.description_text || '',
+          description_html: found?.description_html || '',
           eyebrow: found?.eyebrow,
           cover_image_url: found?.cover_image_url || '',
           duration_minutes: found?.duration_minutes || 0,
           lessons_count: found?.lessons_count || 0,
-          is_enrolled: false,
+          is_enrolled: isActuallyEnrolled,
           created_at: found?.created_at || '',
           is_free: found?.is_free,
           price_cents: found?.price_cents,
+          discount_price_cents: found?.discount_price_cents,
+          display_price_cents: found?.display_price_cents,
+          has_discount: found?.has_discount,
+          currency: found?.currency,
           checkout_url: found?.checkout_url,
           sections: [],
           reviews: [],
-          access_expired: true,
-          error_message: res.error || 'Your access to this course has ended.',
+          access_expired: isActuallyExpired,
+          error_message: isActuallyExpired ? 'Your access period for this course has ended.' : undefined,
         } as CourseDetail;
       }
       return null;
@@ -493,8 +513,7 @@ class LmsApiClient {
       courseObj.is_enrolled = Boolean(
         courseObj.enrollment?.status === 'active' ||
         courseObj.enrollment ||
-        courseObj.is_enrolled ||
-        true
+        courseObj.is_enrolled
       );
     }
     return courseObj as CourseDetail;

@@ -46,7 +46,7 @@ export const CertificatesScreen: React.FC<{ navigation?: any }> = ({ navigation 
         const pending = dash.enrolled_courses.filter((c: any) => {
           const isCompleted =
             (typeof c.progress_percent === 'number' && c.progress_percent >= 100) ||
-            Boolean(c.is_completed || c.completed || c.access_expired);
+            Boolean(c.is_completed || c.completed);
           const hasIssuedCert = certCourseTitles.has(c.title?.toLowerCase().trim());
           return isCompleted && !hasIssuedCert;
         });
