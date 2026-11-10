@@ -13,7 +13,7 @@
     },
     "androidNavigationBar": {
       "barStyle": "dark-content",
-      "backgroundColor": "#ffffff",
+      "backgroundColor": "#f8fafc",
       "visible": "always"
     },
     "splash": {

@@ -12,7 +12,7 @@ function MainApp() {
   const insets = useSafeAreaInsets();
 
   return (
-    <View style={{ flex: 1, backgroundColor: Colors.surface }}>
+    <View style={{ flex: 1, backgroundColor: Colors.canvas }}>
       <StatusBar style="dark" />
       {Platform.OS === 'android' && (
         <NavigationBar style="dark" />
@@ -23,7 +23,7 @@ function MainApp() {
         </AuthProvider>
       </AppErrorBoundary>
 
-      {/* Solid bottom strip matching status bar so content never paints behind Android navigation buttons */}
+      {/* Solid bottom strip matching page background so content never clashes behind Android navigation buttons */}
       {insets.bottom > 0 && (
         <View
           style={{
@@ -32,7 +32,7 @@ function MainApp() {
             left: 0,
             right: 0,
             height: insets.bottom,
-            backgroundColor: '#FFFFFF',
+            backgroundColor: Colors.canvas,
             zIndex: 9999,
             elevation: 9999,
           }}

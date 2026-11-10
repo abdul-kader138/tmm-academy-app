@@ -43,8 +43,10 @@ const navTheme = {
 
 function BottomTabs() {
   const insets = useSafeAreaInsets();
-  const bottomPadding = insets.bottom > 0 ? insets.bottom : (Platform.OS === 'android' ? 10 : 8);
-  const tabHeight = 58 + bottomPadding;
+  // When system navigation is off/gesture, insets.bottom is 0 so tabs sit directly at the bottom edge.
+  // When system navigation is on, bottomPadding matches insets.bottom exactly.
+  const bottomPadding = insets.bottom;
+  const tabHeight = 56 + bottomPadding;
 
   return (
     <Tab.Navigator
