@@ -15,7 +15,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors, cardShadow } from '../theme/colors';
 import { useAuth } from '../context/AuthContext';
-import { lmsApi } from '../api/lmsApi';
+import { lmsApi, API_BASE_URL } from '../api/lmsApi';
 import { CourseCatalogItem } from '../api/types';
 import { cleanHtml } from '../utils/text';
 import { getCoursePricing } from '../utils/pricing';
@@ -197,12 +197,8 @@ export const WelcomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => 
             Select an enrolled course to jump into your classroom, or browse new tracks.
           </Text>
 
-          {/* Track Filter Pills */}
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.filterPillsScroll}
-          >
+          {/* Track Filter Pills (Clean Wrapping Row - No Horizontal Scroll) */}
+          <View style={styles.filterPillsRow}>
             <TouchableOpacity
               style={[styles.filterPill, styles.filterPillActive]}
               onPress={handleOpenCourses}
@@ -230,16 +226,16 @@ export const WelcomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => 
             >
               <Text style={styles.filterPillText}>Advance & Popular Course</Text>
             </TouchableOpacity>
-          </ScrollView>
+          </View>
         </View>
 
         {/* ================= EXTRA RICH FEATURES ADDED BELOW AVAILABLE COURSES ================= */}
 
-        {/* 1. Featured Career Tracks Horizontal Carousel (Dynamic from LMS API) */}
+        {/* 1. Featured Career Tracks (Vertical List as requested) */}
         <View style={styles.tracksCarouselHeader}>
           <Text style={styles.subSectionTitle}>Featured Career Tracks</Text>
           <Text style={styles.subSectionSubtitle}>
-            Swipe through in-demand executive programs tailored for Italy
+            Explore in-demand executive programs tailored for Italy
           </Text>
         </View>
 
@@ -248,12 +244,8 @@ export const WelcomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => 
             <ActivityIndicator size="small" color={Colors.signal} />
           </View>
         ) : courses.length > 0 ? (
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.tracksCarouselScroll}
-          >
-            {courses.slice(0, 6).map((item) => {
+          <View style={styles.tracksVerticalList}>
+            {courses.slice(0, 4).map((item) => {
               const pricing = getCoursePricing(item);
               const durationHours = Math.round((item.duration_minutes || 0) / 60);
               const durationText =
@@ -263,6 +255,12 @@ export const WelcomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => 
                   ? `${item.duration_minutes}m`
                   : 'Self-paced';
 
+              const imageUrl = item.cover_image_url?.startsWith('http')
+                ? item.cover_image_url
+                : item.cover_image_url
+                ? `${API_BASE_URL}${item.cover_image_url}`
+                : null;
+
               return (
                 <TouchableOpacity
                   key={item.id}
@@ -270,37 +268,53 @@ export const WelcomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => 
                   onPress={() => navigation.navigate('CourseDetail', { course: item })}
                   activeOpacity={0.88}
                 >
-                  {Boolean(item.eyebrow) && (
-                    <View style={[styles.trackBadge, { backgroundColor: '#ECFEFF' }]}>
-                      <Text style={[styles.trackBadgeText, { color: '#0E7490' }]}>
-                        {item.eyebrow!.toUpperCase()}
-                      </Text>
-                    </View>
-                  )}
+                  {Boolean(imageUrl) ? (
+                    <Image
+                      source={{ uri: imageUrl! }}
+                      style={styles.trackCardImage}
+                      resizeMode="cover"
+                    />
+                  ) : null}
 
-                  <Text style={styles.trackTitle} numberOfLines={2}>
-                    {item.title}
-                  </Text>
-
-                  <Text style={styles.trackDesc} numberOfLines={3}>
-                    {cleanHtml(item.description_text || item.description)}
-                  </Text>
-
-                  <View style={styles.trackFooter}>
-                    <View style={styles.trackMeta}>
-                      <Ionicons name="time-outline" size={13} color={Colors.textMuted} />
-                      <Text style={styles.trackMetaText}>{durationText}</Text>
+                  <View style={styles.trackCardBody}>
+                    <View style={styles.trackHeaderRow}>
+                      {Boolean(item.eyebrow) && (
+                        <View style={styles.trackBadge}>
+                          <Text style={styles.trackBadgeText}>
+                            {item.eyebrow!.toUpperCase()}
+                          </Text>
+                        </View>
+                      )}
+                      <Text style={styles.trackPriceBadge}>{pricing.displayPrice}</Text>
                     </View>
-                    <View style={styles.trackMeta}>
-                      <Ionicons name="play-circle-outline" size={13} color={Colors.signal} />
-                      <Text style={styles.trackMetaText}>{item.lessons_count || 0} Lessons</Text>
+
+                    <Text style={styles.trackTitle} numberOfLines={2}>
+                      {item.title}
+                    </Text>
+
+                    <Text style={styles.trackDesc} numberOfLines={2}>
+                      {cleanHtml(item.description_text || item.description)}
+                    </Text>
+
+                    <View style={styles.trackFooter}>
+                      <View style={styles.trackMeta}>
+                        <Ionicons name="time-outline" size={13} color={Colors.textMuted} />
+                        <Text style={styles.trackMetaText}>{durationText}</Text>
+                        <Text style={styles.trackMetaDot}>•</Text>
+                        <Ionicons name="play-circle-outline" size={13} color={Colors.signal} />
+                        <Text style={styles.trackMetaText}>{item.lessons_count || 0} Lessons</Text>
+                      </View>
+
+                      <View style={styles.trackActionBtn}>
+                        <Text style={styles.trackActionBtnText}>View</Text>
+                        <Ionicons name="arrow-forward" size={12} color="#FFFFFF" />
+                      </View>
                     </View>
-                    <Text style={styles.trackRating}>{pricing.displayPrice}</Text>
                   </View>
                 </TouchableOpacity>
               );
             })}
-          </ScrollView>
+          </View>
         ) : null}
 
         {/* 2. Built for Your Mobile Routine — 3 App Advantages */}
@@ -523,13 +537,14 @@ const styles = StyleSheet.create({
     lineHeight: 19,
     marginBottom: 14,
   },
-  filterPillsScroll: {
+  filterPillsRow: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: 8,
     paddingBottom: 4,
   },
   filterPill: {
-    paddingHorizontal: 14,
+    paddingHorizontal: 13,
     paddingVertical: 7,
     borderRadius: 8,
     backgroundColor: Colors.surface,
@@ -567,46 +582,65 @@ const styles = StyleSheet.create({
     color: Colors.textSecondary,
     lineHeight: 18,
   },
-  tracksCarouselScroll: {
-    paddingRight: 10,
-    paddingBottom: 6,
-    gap: 12,
+  tracksVerticalList: {
+    gap: 14,
     marginTop: 8,
     marginBottom: 24,
   },
   trackCard: {
-    width: SCREEN_WIDTH * 0.72,
+    width: '100%',
     backgroundColor: Colors.surface,
     borderRadius: 14,
-    padding: 16,
+    overflow: 'hidden',
     borderWidth: 1,
     borderColor: Colors.borderSubtle,
+  },
+  trackCardImage: {
+    width: '100%',
+    height: 140,
+    backgroundColor: '#0F172A',
+  },
+  trackCardBody: {
+    padding: 14,
+  },
+  trackHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
     justifyContent: 'space-between',
+    marginBottom: 8,
   },
   trackBadge: {
     alignSelf: 'flex-start',
+    backgroundColor: '#ECFEFF',
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: 6,
-    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: '#A5F3FC',
   },
   trackBadgeText: {
-    fontSize: 9.5,
+    fontSize: 10,
     fontWeight: '800',
+    color: '#0E7490',
     letterSpacing: 0.4,
   },
+  trackPriceBadge: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: '#0F172A',
+  },
   trackTitle: {
-    fontSize: 15,
+    fontSize: 16,
     fontWeight: '700',
     color: Colors.textMain,
-    lineHeight: 20,
-    marginBottom: 6,
+    lineHeight: 22,
+    marginBottom: 4,
   },
   trackDesc: {
-    fontSize: 12,
+    fontSize: 12.5,
     color: Colors.textSecondary,
-    lineHeight: 17,
-    marginBottom: 14,
+    lineHeight: 18,
+    marginBottom: 12,
   },
   trackFooter: {
     flexDirection: 'row',
@@ -619,12 +653,30 @@ const styles = StyleSheet.create({
   trackMeta: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    gap: 5,
   },
   trackMetaText: {
+    fontSize: 12,
+    color: Colors.textSecondary,
+    fontWeight: '500',
+  },
+  trackMetaDot: {
     fontSize: 11,
-    color: Colors.textMuted,
-    fontWeight: '600',
+    color: '#CBD5E1',
+  },
+  trackActionBtn: {
+    backgroundColor: '#0E7490',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 6,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  trackActionBtnText: {
+    color: '#FFFFFF',
+    fontSize: 11,
+    fontWeight: '700',
   },
   trackRating: {
     fontSize: 11,
