@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -9,11 +9,16 @@ import {
   Platform,
   Image,
   Animated,
+  ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors, cardShadow } from '../theme/colors';
 import { useAuth } from '../context/AuthContext';
+import { lmsApi } from '../api/lmsApi';
+import { CourseCatalogItem } from '../api/types';
+import { cleanHtml } from '../utils/text';
+import { getCoursePricing } from '../utils/pricing';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -21,6 +26,8 @@ export const WelcomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => 
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
   const floatAnim = useRef(new Animated.Value(0)).current;
+  const [courses, setCourses] = useState<CourseCatalogItem[]>([]);
+  const [loadingCourses, setLoadingCourses] = useState(true);
 
   const handleOpenCourses = () => {
     if (user) {
@@ -35,6 +42,25 @@ export const WelcomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => 
       navigation.reset({ index: 0, routes: [{ name: 'MainTabs' }] });
     }
   }, [user]);
+
+  useEffect(() => {
+    let isMounted = true;
+    void (async () => {
+      try {
+        const data = await lmsApi.getCourses();
+        if (isMounted && Array.isArray(data)) {
+          setCourses(data);
+        }
+      } catch {
+        if (isMounted) setCourses([]);
+      } finally {
+        if (isMounted) setLoadingCourses(false);
+      }
+    })();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   useEffect(() => {
     // Subtle breathing float for the hero illustration
@@ -53,43 +79,6 @@ export const WelcomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => 
       ])
     ).start();
   }, [floatAnim]);
-
-  // Featured Career Tracks Carousel Data
-  const featuredTracks = [
-    {
-      id: 'boc-12',
-      badge: 'TOP TRACK',
-      title: 'BOC-12 বিজনেস অপরচুনিটি কোর্স',
-      desc: 'ইমিগ্রেশন ও লিগ্যাল প্রসেস, ট্যাক্স রিটার্ন (730/UNICO) ও পার্তিতা ইভা খোলার কমপ্লিট সমাধান।',
-      duration: '83 hrs',
-      lessons: '3 Modules',
-      rating: '4.9 ★',
-      badgeColor: '#0E7490',
-      badgeBg: '#ECFEFF',
-    },
-    {
-      id: 'contabilita',
-      badge: 'FINANCIAL SKILL',
-      title: 'Contabilità (কন্তাবিলিতা) কমপ্লিট কোর্স',
-      desc: 'বাংলা ভাষায় সম্পূর্ণ হিসাবরক্ষণ, ভ্যাট ইনভয়েস ও ছোট-মাঝারি ব্যবসার জন্য নিখুঁত ট্যাক্স কৌশল।',
-      duration: '45 hrs',
-      lessons: 'Full Series',
-      rating: '5.0 ★',
-      badgeColor: '#059669',
-      badgeBg: '#ECFDF5',
-    },
-    {
-      id: 'colf-badanti',
-      badge: 'JOB READY',
-      title: 'Colf, Badanti ও Lavoro Domestico',
-      desc: 'ইতালিতে পেশাদার ও আইনসম্মত গৃহসেবা প্রশিক্ষণ, কন্ট্রাক্ট ও অধিকার বিষয়ক বাস্তব গাইড।',
-      duration: '30 hrs',
-      lessons: 'Certification',
-      rating: '4.8 ★',
-      badgeColor: '#7C3AED',
-      badgeBg: '#F5F3FF',
-    },
-  ];
 
   return (
     <View style={styles.container}>
@@ -246,7 +235,7 @@ export const WelcomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => 
 
         {/* ================= EXTRA RICH FEATURES ADDED BELOW AVAILABLE COURSES ================= */}
 
-        {/* 1. Featured Career Tracks Horizontal Carousel */}
+        {/* 1. Featured Career Tracks Horizontal Carousel (Dynamic from LMS API) */}
         <View style={styles.tracksCarouselHeader}>
           <Text style={styles.subSectionTitle}>Featured Career Tracks</Text>
           <Text style={styles.subSectionSubtitle}>
@@ -254,44 +243,65 @@ export const WelcomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => 
           </Text>
         </View>
 
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.tracksCarouselScroll}
-        >
-          {featuredTracks.map((item) => (
-            <TouchableOpacity
-              key={item.id}
-              style={[styles.trackCard, cardShadow(1)]}
-              onPress={handleOpenCourses}
-              activeOpacity={0.88}
-            >
-              <View style={[styles.trackBadge, { backgroundColor: item.badgeBg }]}>
-                <Text style={[styles.trackBadgeText, { color: item.badgeColor }]}>{item.badge}</Text>
-              </View>
+        {loadingCourses ? (
+          <View style={{ paddingVertical: 24, alignItems: 'center' }}>
+            <ActivityIndicator size="small" color={Colors.signal} />
+          </View>
+        ) : courses.length > 0 ? (
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.tracksCarouselScroll}
+          >
+            {courses.slice(0, 6).map((item) => {
+              const pricing = getCoursePricing(item);
+              const durationHours = Math.round((item.duration_minutes || 0) / 60);
+              const durationText =
+                durationHours > 0
+                  ? `${durationHours}h`
+                  : item.duration_minutes > 0
+                  ? `${item.duration_minutes}m`
+                  : 'Self-paced';
 
-              <Text style={styles.trackTitle} numberOfLines={2}>
-                {item.title}
-              </Text>
+              return (
+                <TouchableOpacity
+                  key={item.id}
+                  style={[styles.trackCard, cardShadow(1)]}
+                  onPress={() => navigation.navigate('CourseDetail', { course: item })}
+                  activeOpacity={0.88}
+                >
+                  {Boolean(item.eyebrow) && (
+                    <View style={[styles.trackBadge, { backgroundColor: '#ECFEFF' }]}>
+                      <Text style={[styles.trackBadgeText, { color: '#0E7490' }]}>
+                        {item.eyebrow!.toUpperCase()}
+                      </Text>
+                    </View>
+                  )}
 
-              <Text style={styles.trackDesc} numberOfLines={3}>
-                {item.desc}
-              </Text>
+                  <Text style={styles.trackTitle} numberOfLines={2}>
+                    {item.title}
+                  </Text>
 
-              <View style={styles.trackFooter}>
-                <View style={styles.trackMeta}>
-                  <Ionicons name="time-outline" size={13} color={Colors.textMuted} />
-                  <Text style={styles.trackMetaText}>{item.duration}</Text>
-                </View>
-                <View style={styles.trackMeta}>
-                  <Ionicons name="play-circle-outline" size={13} color={Colors.signal} />
-                  <Text style={styles.trackMetaText}>{item.lessons}</Text>
-                </View>
-                <Text style={styles.trackRating}>{item.rating}</Text>
-              </View>
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
+                  <Text style={styles.trackDesc} numberOfLines={3}>
+                    {cleanHtml(item.description_text || item.description)}
+                  </Text>
+
+                  <View style={styles.trackFooter}>
+                    <View style={styles.trackMeta}>
+                      <Ionicons name="time-outline" size={13} color={Colors.textMuted} />
+                      <Text style={styles.trackMetaText}>{durationText}</Text>
+                    </View>
+                    <View style={styles.trackMeta}>
+                      <Ionicons name="play-circle-outline" size={13} color={Colors.signal} />
+                      <Text style={styles.trackMetaText}>{item.lessons_count || 0} Lessons</Text>
+                    </View>
+                    <Text style={styles.trackRating}>{pricing.displayPrice}</Text>
+                  </View>
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
+        ) : null}
 
         {/* 2. Built for Your Mobile Routine — 3 App Advantages */}
         <View style={styles.perksSection}>

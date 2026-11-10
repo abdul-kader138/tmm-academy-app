@@ -92,7 +92,7 @@ export const CourseCatalogScreen: React.FC<{ navigation: any }> = ({ navigation 
       : null;
 
     const pricing = getCoursePricing(item);
-    const category = item.eyebrow || 'Masterclass';
+    const category = item.eyebrow?.trim() ? item.eyebrow.toUpperCase() : null;
     const lessonsCount = item.lessons_count || 0;
     const durationHours = Math.round((item.duration_minutes || 0) / 60);
     const durationText =
@@ -101,6 +101,8 @@ export const CourseCatalogScreen: React.FC<{ navigation: any }> = ({ navigation 
         : item.duration_minutes > 0
         ? `${item.duration_minutes}m`
         : null;
+    const ratingValue = (item as any).rating || (item as any).average_rating || (item as any).reviews_avg_rating;
+    const discountText = pricing.discountPercent ? `Save ${pricing.discountPercent}%` : pricing.discountBadgeText;
 
     return (
       <TouchableOpacity
@@ -122,10 +124,12 @@ export const CourseCatalogScreen: React.FC<{ navigation: any }> = ({ navigation 
             </View>
           )}
 
-          {/* Subtle Category Pill on Image Top-Left */}
-          <View style={styles.imageTag}>
-            <Text style={styles.imageTagText}>{category.toUpperCase()}</Text>
-          </View>
+          {/* Category Pill on Image Top-Left (Only if provided by API) */}
+          {Boolean(category) && (
+            <View style={styles.imageTag}>
+              <Text style={styles.imageTagText}>{category}</Text>
+            </View>
+          )}
         </View>
 
         {/* Card Body */}
@@ -149,10 +153,12 @@ export const CourseCatalogScreen: React.FC<{ navigation: any }> = ({ navigation 
               ) : null}
             </View>
 
-            <View style={styles.ratingBadge}>
-              <Ionicons name="star" size={12} color="#F59E0B" />
-              <Text style={styles.ratingText}>4.9</Text>
-            </View>
+            {Boolean(ratingValue) && (
+              <View style={styles.ratingBadge}>
+                <Ionicons name="star" size={12} color="#F59E0B" />
+                <Text style={styles.ratingText}>{ratingValue}</Text>
+              </View>
+            )}
           </View>
 
           {/* Course Title */}
@@ -175,11 +181,11 @@ export const CourseCatalogScreen: React.FC<{ navigation: any }> = ({ navigation 
                 <View>
                   <View style={styles.discountRow}>
                     <Text style={styles.originalPrice}>{pricing.originalPrice}</Text>
-                    <View style={styles.discountBadge}>
-                      <Text style={styles.discountBadgeText}>
-                        Save {pricing.discountPercent || 34}%
-                      </Text>
-                    </View>
+                    {Boolean(discountText) && (
+                      <View style={styles.discountBadge}>
+                        <Text style={styles.discountBadgeText}>{discountText}</Text>
+                      </View>
+                    )}
                   </View>
                   <Text style={styles.currentPrice}>{pricing.displayPrice}</Text>
                 </View>
