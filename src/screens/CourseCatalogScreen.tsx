@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -92,129 +92,129 @@ export const CourseCatalogScreen: React.FC<{ navigation: any }> = ({ navigation 
       : null;
 
     const pricing = getCoursePricing(item);
-    const category = item.eyebrow ? item.eyebrow.toUpperCase() : 'MASTERCLASS';
+    const category = item.eyebrow || 'Masterclass';
     const lessonsCount = item.lessons_count || 0;
-    const durationText = item.duration_minutes > 0 ? `${item.duration_minutes} min` : 'Self-paced';
-
-    const getCtaLabel = () => {
-      if (item.is_enrolled) return 'Go to Classroom';
-      if (!user) return 'Sign In to Access';
-      if (pricing.isFree) return 'Start Learning Free';
-      return 'Enroll Now';
-    };
+    const durationHours = Math.round((item.duration_minutes || 0) / 60);
+    const durationText =
+      durationHours > 0
+        ? `${durationHours}h`
+        : item.duration_minutes > 0
+        ? `${item.duration_minutes}m`
+        : null;
 
     return (
       <TouchableOpacity
-        activeOpacity={0.92}
-        style={[styles.webCourseCard, cardShadow(2)]}
+        activeOpacity={0.9}
+        style={[styles.saasCard, cardShadow(1)]}
         onPress={() => navigation.navigate('CourseDetail', { course: item })}
       >
-        {/* Cover Image with Web-Style Badges */}
-        <View style={styles.webImageWrapper}>
+        {/* Cover Image */}
+        <View style={styles.imageContainer}>
           {Boolean(imageUrl) ? (
             <Image
               source={{ uri: imageUrl! }}
-              style={styles.webCourseImage}
+              style={styles.coverImage}
               resizeMode="cover"
             />
           ) : (
-            <View style={styles.webImagePlaceholder}>
-              <Ionicons name="book-outline" size={44} color="#94A3B8" />
+            <View style={styles.imagePlaceholder}>
+              <Ionicons name="book-outline" size={36} color="#94A3B8" />
             </View>
           )}
 
-          {/* Top-Left Category Pill (e.g. MASTERCLASS) */}
-          <View style={styles.webCategoryPill}>
-            <Text style={styles.webCategoryPillText}>{category}</Text>
-          </View>
-
-          {/* Bottom-Left Document / Lesson Icon Box */}
-          <View style={styles.webDocIconBox}>
-            <Ionicons name="newspaper-outline" size={18} color="#0E7490" />
-          </View>
-
-          {/* Bottom-Right Lessons Count Pill */}
-          <View style={styles.webLessonsPill}>
-            <Text style={styles.webLessonsPillText}>{lessonsCount} Lessons</Text>
+          {/* Subtle Category Pill on Image Top-Left */}
+          <View style={styles.imageTag}>
+            <Text style={styles.imageTagText}>{category.toUpperCase()}</Text>
           </View>
         </View>
 
         {/* Card Body */}
-        <View style={styles.webCardContent}>
-          {/* Title */}
-          <Text style={styles.webTitle} numberOfLines={2}>
+        <View style={styles.cardBody}>
+          {/* Top Meta Line: Lessons, Duration, Rating */}
+          <View style={styles.metaRow}>
+            <View style={styles.metaLeft}>
+              <View style={styles.metaBadge}>
+                <Ionicons name="film-outline" size={12} color="#64748B" />
+                <Text style={styles.metaBadgeText}>{lessonsCount} Lessons</Text>
+              </View>
+
+              {durationText ? (
+                <>
+                  <Text style={styles.metaDot}>•</Text>
+                  <View style={styles.metaBadge}>
+                    <Ionicons name="time-outline" size={12} color="#64748B" />
+                    <Text style={styles.metaBadgeText}>{durationText}</Text>
+                  </View>
+                </>
+              ) : null}
+            </View>
+
+            <View style={styles.ratingBadge}>
+              <Ionicons name="star" size={12} color="#F59E0B" />
+              <Text style={styles.ratingText}>4.9</Text>
+            </View>
+          </View>
+
+          {/* Course Title */}
+          <Text style={styles.title} numberOfLines={2}>
             {item.title}
           </Text>
 
-          {/* 2-line Description */}
-          <Text style={styles.webDesc} numberOfLines={2}>
+          {/* Description */}
+          <Text style={styles.description} numberOfLines={2}>
             {cleanHtml(item.description_text || item.description)}
           </Text>
 
-          {/* Meta Row: Duration, Lessons, Rating */}
-          <View style={styles.webMetaRow}>
-            <View style={styles.webMetaLeft}>
-              <View style={styles.webMetaItem}>
-                <Ionicons name="time-outline" size={14} color="#64748B" />
-                <Text style={styles.webMetaText}>{durationText}</Text>
-              </View>
-
-              <View style={styles.webMetaItem}>
-                <Ionicons name="film-outline" size={14} color="#64748B" />
-                <Text style={styles.webMetaText}>{lessonsCount} lessons</Text>
-              </View>
-            </View>
-
-            {/* Rating */}
-            <View style={styles.webRatingWrap}>
-              <Ionicons name="star" size={13} color="#F59E0B" />
-              <Text style={styles.webRatingText}>4.9</Text>
-            </View>
-          </View>
-
           {/* Hairline Divider */}
-          <View style={styles.webDivider} />
+          <View style={styles.divider} />
 
-          {/* Pricing Row */}
-          <View style={styles.webPricingRow}>
-            <View style={styles.webPriceStack}>
+          {/* SaaS Footer: Pricing on Left + Action Button on Right */}
+          <View style={styles.footerRow}>
+            <View style={styles.pricingLeft}>
               {pricing.hasDiscount && pricing.originalPrice ? (
-                <>
-                  <Text style={styles.webStrikePrice}>{pricing.originalPrice}</Text>
-                  <Text style={styles.webMainPrice}>{pricing.displayPrice}</Text>
-                </>
+                <View>
+                  <View style={styles.discountRow}>
+                    <Text style={styles.originalPrice}>{pricing.originalPrice}</Text>
+                    <View style={styles.discountBadge}>
+                      <Text style={styles.discountBadgeText}>
+                        Save {pricing.discountPercent || 34}%
+                      </Text>
+                    </View>
+                  </View>
+                  <Text style={styles.currentPrice}>{pricing.displayPrice}</Text>
+                </View>
               ) : (
-                <Text style={styles.webMainPrice}>
-                  {pricing.isFree ? 'Free' : pricing.displayPrice}
-                </Text>
+                <View>
+                  {pricing.isFree ? (
+                    <View style={styles.freeBadge}>
+                      <Text style={styles.freeBadgeText}>FREE ACCESS</Text>
+                    </View>
+                  ) : (
+                    <Text style={styles.currentPrice}>{pricing.displayPrice}</Text>
+                  )}
+                </View>
               )}
             </View>
 
-            {/* Right-aligned Badge: Discount / Free */}
-            {pricing.hasDiscount ? (
-              <View style={styles.webDiscountPill}>
-                <Ionicons name="pricetag-outline" size={12} color="#0D9488" />
-                <Text style={styles.webDiscountPillText}>
-                  Save {pricing.discountPercent ? `${pricing.discountPercent}%` : '34%'}
-                </Text>
-              </View>
-            ) : pricing.isFree ? (
-              <View style={styles.webDiscountPill}>
-                <Ionicons name="sparkles-outline" size={12} color="#0D9488" />
-                <Text style={styles.webDiscountPillText}>Free Access</Text>
-              </View>
-            ) : null}
+            {/* Compact Action Button */}
+            <TouchableOpacity
+              style={[
+                styles.actionBtn,
+                item.is_enrolled && styles.actionBtnEnrolled,
+              ]}
+              activeOpacity={0.8}
+              onPress={() => navigation.navigate('CourseDetail', { course: item })}
+            >
+              <Text style={styles.actionBtnText}>
+                {item.is_enrolled ? 'Classroom' : 'View Course'}
+              </Text>
+              <Ionicons
+                name={item.is_enrolled ? 'play-circle' : 'arrow-forward'}
+                size={14}
+                color="#FFFFFF"
+              />
+            </TouchableOpacity>
           </View>
-
-          {/* Full-Width Action Button */}
-          <TouchableOpacity
-            style={styles.webCtaButton}
-            activeOpacity={0.85}
-            onPress={() => navigation.navigate('CourseDetail', { course: item })}
-          >
-            <Text style={styles.webCtaText}>{getCtaLabel()}</Text>
-            <Ionicons name="arrow-forward" size={16} color="#FFFFFF" />
-          </TouchableOpacity>
         </View>
       </TouchableOpacity>
     );
@@ -361,188 +361,176 @@ const styles = StyleSheet.create({
     padding: 16,
     gap: 16,
   },
-  webCourseCard: {
+  saasCard: {
     backgroundColor: '#FFFFFF',
     borderRadius: 16,
     overflow: 'hidden',
     borderWidth: 1,
     borderColor: '#E2E8F0',
   },
-  webImageWrapper: {
+  imageContainer: {
     position: 'relative',
     width: '100%',
-    height: 185,
+    height: 155,
     backgroundColor: '#0F172A',
   },
-  webCourseImage: {
+  coverImage: {
     width: '100%',
     height: '100%',
   },
-  webImagePlaceholder: {
+  imagePlaceholder: {
     width: '100%',
     height: '100%',
     backgroundColor: '#F1F5F9',
     justifyContent: 'center',
     alignItems: 'center',
   },
-  webCategoryPill: {
+  imageTag: {
     position: 'absolute',
-    top: 12,
-    left: 12,
-    backgroundColor: '#FFFFFF',
-    paddingHorizontal: 10,
-    paddingVertical: 5,
+    top: 10,
+    left: 10,
+    backgroundColor: 'rgba(15, 23, 42, 0.75)',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
     borderRadius: 6,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.15,
-    shadowRadius: 3,
-    elevation: 3,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
   },
-  webCategoryPillText: {
-    color: '#0F172A',
-    fontSize: 11,
+  imageTagText: {
+    color: '#FFFFFF',
+    fontSize: 10,
     fontWeight: '800',
-    letterSpacing: 0.4,
+    letterSpacing: 0.5,
   },
-  webDocIconBox: {
-    position: 'absolute',
-    bottom: 12,
-    left: 12,
-    width: 36,
-    height: 36,
-    borderRadius: 8,
-    backgroundColor: '#FFFFFF',
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.15,
-    shadowRadius: 3,
-    elevation: 3,
+  cardBody: {
+    padding: 14,
   },
-  webLessonsPill: {
-    position: 'absolute',
-    bottom: 12,
-    right: 12,
-    backgroundColor: '#FFFFFF',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 6,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.15,
-    shadowRadius: 3,
-    elevation: 3,
-  },
-  webLessonsPillText: {
-    color: '#0F172A',
-    fontSize: 12,
-    fontWeight: '800',
-  },
-  webCardContent: {
-    padding: 16,
-  },
-  webTitle: {
-    fontSize: 18,
-    fontWeight: '800',
-    color: '#0F172A',
-    marginBottom: 6,
-    lineHeight: 24,
-    letterSpacing: -0.2,
-  },
-  webDesc: {
-    fontSize: 13,
-    lineHeight: 20,
-    color: '#475569',
-    marginBottom: 12,
-  },
-  webMetaRow: {
+  metaRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 12,
+    marginBottom: 8,
   },
-  webMetaLeft: {
+  metaLeft: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 14,
+    gap: 6,
   },
-  webMetaItem: {
+  metaBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 5,
+    gap: 4,
   },
-  webMetaText: {
-    fontSize: 12,
+  metaBadgeText: {
+    fontSize: 11,
     fontWeight: '600',
     color: '#64748B',
   },
-  webRatingWrap: {
+  metaDot: {
+    fontSize: 11,
+    color: '#CBD5E1',
+  },
+  ratingBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    gap: 3,
+    backgroundColor: '#FEF3C7',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
   },
-  webRatingText: {
-    fontSize: 12,
+  ratingText: {
+    fontSize: 11,
     fontWeight: '800',
-    color: '#D97706',
+    color: '#B45309',
   },
-  webDivider: {
+  title: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: '#0F172A',
+    marginBottom: 4,
+    lineHeight: 22,
+    letterSpacing: -0.2,
+  },
+  description: {
+    fontSize: 12.5,
+    lineHeight: 18,
+    color: '#64748B',
+    marginBottom: 12,
+  },
+  divider: {
     height: 1,
     backgroundColor: '#F1F5F9',
-    marginBottom: 14,
+    marginBottom: 12,
   },
-  webPricingRow: {
+  footerRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 14,
   },
-  webPriceStack: {
+  pricingLeft: {
     justifyContent: 'center',
   },
-  webStrikePrice: {
-    fontSize: 12,
+  discountRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 1,
+  },
+  originalPrice: {
+    fontSize: 11,
     color: '#94A3B8',
     textDecorationLine: 'line-through',
     fontWeight: '600',
-    marginBottom: 1,
   },
-  webMainPrice: {
-    fontSize: 22,
+  discountBadge: {
+    backgroundColor: '#ECFDF5',
+    borderColor: '#A7F3D0',
+    borderWidth: 1,
+    paddingHorizontal: 5,
+    paddingVertical: 1,
+    borderRadius: 4,
+  },
+  discountBadgeText: {
+    color: '#059669',
+    fontSize: 10,
+    fontWeight: '800',
+  },
+  currentPrice: {
+    fontSize: 18,
     fontWeight: '900',
     color: '#0F172A',
-    letterSpacing: -0.4,
+    letterSpacing: -0.3,
   },
-  webDiscountPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
+  freeBadge: {
     backgroundColor: '#ECFDF5',
     borderColor: '#A7F3D0',
     borderWidth: 1,
     paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 6,
+    paddingVertical: 3,
+    borderRadius: 4,
   },
-  webDiscountPillText: {
-    color: '#0D9488',
+  freeBadgeText: {
+    color: '#059669',
     fontSize: 11,
     fontWeight: '800',
+    letterSpacing: 0.3,
   },
-  webCtaButton: {
+  actionBtn: {
     backgroundColor: '#0E7490',
     borderRadius: 8,
-    paddingVertical: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
     flexDirection: 'row',
-    justifyContent: 'center',
     alignItems: 'center',
-    gap: 6,
+    gap: 5,
   },
-  webCtaText: {
+  actionBtnEnrolled: {
+    backgroundColor: '#059669',
+  },
+  actionBtnText: {
     color: '#FFFFFF',
-    fontSize: 14,
+    fontSize: 12,
     fontWeight: '700',
   },
   centerContainer: {
