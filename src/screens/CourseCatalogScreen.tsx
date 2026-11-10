@@ -29,16 +29,6 @@ export const CourseCatalogScreen: React.FC<{ navigation: any }> = ({ navigation 
   const [refreshing, setRefreshing] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
 
-  const handleGoBack = () => {
-    if (navigation.canGoBack()) {
-      navigation.goBack();
-    } else if (user) {
-      navigation.navigate('MainTabs', { screen: 'DashboardTab' });
-    } else {
-      navigation.navigate('Welcome');
-    }
-  };
-
   const fetchCourses = useCallback(async (isSilent = false) => {
     if (!isSilent) setLoading(true);
     try {
@@ -238,14 +228,6 @@ export const CourseCatalogScreen: React.FC<{ navigation: any }> = ({ navigation 
         ]}
       >
         <View style={styles.headerTopRow}>
-          <TouchableOpacity
-            style={styles.backButton}
-            onPress={handleGoBack}
-            activeOpacity={0.7}
-            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-          >
-            <Ionicons name="arrow-back" size={20} color={Colors.textMain} />
-          </TouchableOpacity>
           <View style={styles.headerTitleWrap}>
             <Text style={styles.screenTitle}>Explore Courses</Text>
             <Text style={styles.screenSubtitle}>Practical tracks for career advancement</Text>
@@ -322,17 +304,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: 8,
-  },
-  backButton: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    backgroundColor: Colors.surfaceElevated,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 12,
-    borderWidth: 1,
-    borderColor: Colors.borderSubtle,
   },
   headerTitleWrap: {
     flex: 1,
