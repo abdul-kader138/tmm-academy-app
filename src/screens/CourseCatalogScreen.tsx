@@ -85,124 +85,136 @@ export const CourseCatalogScreen: React.FC<{ navigation: any }> = ({ navigation 
   );
 
   const renderCourseItem = ({ item }: { item: CourseCatalogItem }) => {
-    const imageUrl = item.cover_image_url.startsWith('http')
+    const imageUrl = item.cover_image_url?.startsWith('http')
       ? item.cover_image_url
-      : `${API_BASE_URL}${item.cover_image_url}`;
+      : item.cover_image_url
+      ? `${API_BASE_URL}${item.cover_image_url}`
+      : null;
 
-    const durationHours = Math.round(item.duration_minutes / 60);
     const pricing = getCoursePricing(item);
+    const category = item.eyebrow ? item.eyebrow.toUpperCase() : 'MASTERCLASS';
+    const lessonsCount = item.lessons_count || 0;
+    const durationText = item.duration_minutes > 0 ? `${item.duration_minutes} min` : 'Self-paced';
+
+    const getCtaLabel = () => {
+      if (item.is_enrolled) return 'Go to Classroom';
+      if (!user) return 'Sign In to Access';
+      if (pricing.isFree) return 'Start Learning Free';
+      return 'Enroll Now';
+    };
 
     return (
       <TouchableOpacity
-        activeOpacity={0.88}
-        style={[styles.courseCard, cardShadow(2)]}
+        activeOpacity={0.92}
+        style={[styles.webCourseCard, cardShadow(2)]}
         onPress={() => navigation.navigate('CourseDetail', { course: item })}
       >
-        <View style={styles.imageWrapper}>
-          {Boolean(imageUrl) && (
+        {/* Cover Image with Web-Style Badges */}
+        <View style={styles.webImageWrapper}>
+          {Boolean(imageUrl) ? (
             <Image
-              source={{ uri: imageUrl }}
-              style={styles.courseImage}
+              source={{ uri: imageUrl! }}
+              style={styles.webCourseImage}
               resizeMode="cover"
             />
-          )}
-
-          {/* Discount Percentage Badge on Top Left */}
-          {pricing.hasDiscount && (
-            <View style={styles.discountBadgeOverlay}>
-              <Ionicons name="flash" size={11} color="#FFFFFF" />
-              <Text style={styles.discountBadgeText}>{pricing.discountBadgeText}</Text>
+          ) : (
+            <View style={styles.webImagePlaceholder}>
+              <Ionicons name="book-outline" size={44} color="#94A3B8" />
             </View>
           )}
 
-          {/* Price Tag Overlay on Top Right */}
-          <View
-            style={[
-              styles.priceBadgeOverlay,
-              pricing.isFree ? styles.priceBadgeFree : styles.priceBadgePaid,
-            ]}
-          >
-            {pricing.hasDiscount && pricing.originalPrice ? (
-              <View style={styles.discountPriceRow}>
-                <Text style={styles.strikeOriginalPrice}>{pricing.originalPrice}</Text>
-                <Text style={styles.priceBadgeTextPaid}>{pricing.displayPrice}</Text>
-              </View>
-            ) : (
-              <Text
-                style={[
-                  styles.priceBadgeText,
-                  pricing.isFree ? styles.priceBadgeTextFree : styles.priceBadgeTextPaid,
-                ]}
-              >
-                {pricing.displayPrice}
-              </Text>
-            )}
+          {/* Top-Left Category Pill (e.g. MASTERCLASS) */}
+          <View style={styles.webCategoryPill}>
+            <Text style={styles.webCategoryPillText}>{category}</Text>
+          </View>
+
+          {/* Bottom-Left Document / Lesson Icon Box */}
+          <View style={styles.webDocIconBox}>
+            <Ionicons name="newspaper-outline" size={18} color="#0E7490" />
+          </View>
+
+          {/* Bottom-Right Lessons Count Pill */}
+          <View style={styles.webLessonsPill}>
+            <Text style={styles.webLessonsPillText}>{lessonsCount} Lessons</Text>
           </View>
         </View>
 
-        <View style={styles.cardContent}>
-          <View style={styles.badgeRow}>
-            {item.eyebrow ? (
-              <View style={styles.eyebrowBadge}>
-                <Text style={styles.eyebrowText}>{item.eyebrow}</Text>
-              </View>
-            ) : null}
-
-            {pricing.hasDiscount && (
-              <View style={styles.discountPill}>
-                <Text style={styles.discountPillText}>{pricing.discountBadgeText}</Text>
-              </View>
-            )}
-
-            <View
-              style={[
-                styles.priceInlinePill,
-                pricing.isFree ? styles.priceBadgeFree : styles.priceBadgePaid,
-              ]}
-            >
-              <Text
-                style={[
-                  styles.priceInlinePillText,
-                  pricing.isFree ? styles.priceBadgeTextFree : styles.priceBadgeTextPaid,
-                ]}
-              >
-                {pricing.isFree ? 'Free Course' : pricing.displayPrice}
-              </Text>
-            </View>
-          </View>
-
-          <Text style={styles.courseTitle} numberOfLines={2}>
+        {/* Card Body */}
+        <View style={styles.webCardContent}>
+          {/* Title */}
+          <Text style={styles.webTitle} numberOfLines={2}>
             {item.title}
           </Text>
 
-          <Text style={styles.courseDesc} numberOfLines={3}>
+          {/* 2-line Description */}
+          <Text style={styles.webDesc} numberOfLines={2}>
             {cleanHtml(item.description_text || item.description)}
           </Text>
 
-          <View style={styles.cardFooter}>
-            <View style={styles.metaItem}>
-              <Ionicons name="time-outline" size={15} color={Colors.signal} />
-              <Text style={styles.metaText}>
-                {durationHours > 0 ? `${durationHours}h` : `${item.duration_minutes}m`}
-              </Text>
+          {/* Meta Row: Duration, Lessons, Rating */}
+          <View style={styles.webMetaRow}>
+            <View style={styles.webMetaLeft}>
+              <View style={styles.webMetaItem}>
+                <Ionicons name="time-outline" size={14} color="#64748B" />
+                <Text style={styles.webMetaText}>{durationText}</Text>
+              </View>
+
+              <View style={styles.webMetaItem}>
+                <Ionicons name="film-outline" size={14} color="#64748B" />
+                <Text style={styles.webMetaText}>{lessonsCount} lessons</Text>
+              </View>
             </View>
 
-            <View style={styles.metaItem}>
-              <Ionicons name="play-circle-outline" size={15} color={Colors.signal} />
-              <Text style={styles.metaText}>{item.lessons_count} Lessons</Text>
-            </View>
-
-            <View style={styles.enrollStatus}>
-              <Text
-                style={[
-                  styles.statusText,
-                  { color: item.is_enrolled ? Colors.emerald : Colors.signal },
-                ]}
-              >
-                {item.is_enrolled ? 'Enrolled' : pricing.isFree ? 'Free' : pricing.displayPrice}
-              </Text>
+            {/* Rating */}
+            <View style={styles.webRatingWrap}>
+              <Ionicons name="star" size={13} color="#F59E0B" />
+              <Text style={styles.webRatingText}>4.9</Text>
             </View>
           </View>
+
+          {/* Hairline Divider */}
+          <View style={styles.webDivider} />
+
+          {/* Pricing Row */}
+          <View style={styles.webPricingRow}>
+            <View style={styles.webPriceStack}>
+              {pricing.hasDiscount && pricing.originalPrice ? (
+                <>
+                  <Text style={styles.webStrikePrice}>{pricing.originalPrice}</Text>
+                  <Text style={styles.webMainPrice}>{pricing.displayPrice}</Text>
+                </>
+              ) : (
+                <Text style={styles.webMainPrice}>
+                  {pricing.isFree ? 'Free' : pricing.displayPrice}
+                </Text>
+              )}
+            </View>
+
+            {/* Right-aligned Badge: Discount / Free */}
+            {pricing.hasDiscount ? (
+              <View style={styles.webDiscountPill}>
+                <Ionicons name="pricetag-outline" size={12} color="#0D9488" />
+                <Text style={styles.webDiscountPillText}>
+                  Save {pricing.discountPercent ? `${pricing.discountPercent}%` : '34%'}
+                </Text>
+              </View>
+            ) : pricing.isFree ? (
+              <View style={styles.webDiscountPill}>
+                <Ionicons name="sparkles-outline" size={12} color="#0D9488" />
+                <Text style={styles.webDiscountPillText}>Free Access</Text>
+              </View>
+            ) : null}
+          </View>
+
+          {/* Full-Width Action Button */}
+          <TouchableOpacity
+            style={styles.webCtaButton}
+            activeOpacity={0.85}
+            onPress={() => navigation.navigate('CourseDetail', { course: item })}
+          >
+            <Text style={styles.webCtaText}>{getCtaLabel()}</Text>
+            <Ionicons name="arrow-forward" size={16} color="#FFFFFF" />
+          </TouchableOpacity>
         </View>
       </TouchableOpacity>
     );
@@ -349,168 +361,188 @@ const styles = StyleSheet.create({
     padding: 16,
     gap: 16,
   },
-  courseCard: {
-    backgroundColor: Colors.surface,
+  webCourseCard: {
+    backgroundColor: '#FFFFFF',
     borderRadius: 16,
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: Colors.borderSubtle,
+    borderColor: '#E2E8F0',
   },
-  imageWrapper: {
+  webImageWrapper: {
     position: 'relative',
     width: '100%',
-    height: 165,
-    backgroundColor: Colors.surfaceElevated,
+    height: 185,
+    backgroundColor: '#0F172A',
   },
-  courseImage: {
+  webCourseImage: {
     width: '100%',
     height: '100%',
   },
-  priceBadgeOverlay: {
+  webImagePlaceholder: {
+    width: '100%',
+    height: '100%',
+    backgroundColor: '#F1F5F9',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  webCategoryPill: {
     position: 'absolute',
-    top: 10,
-    right: 10,
+    top: 12,
+    left: 12,
+    backgroundColor: '#FFFFFF',
     paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 8,
-    borderWidth: 1,
-  },
-  priceBadgeFree: {
-    backgroundColor: '#ECFDF5',
-    borderColor: '#A7F3D0',
-  },
-  priceBadgePaid: {
-    backgroundColor: 'rgba(15, 23, 42, 0.88)',
-    borderColor: '#334155',
-  },
-  discountBadgeOverlay: {
-    position: 'absolute',
-    top: 10,
-    left: 10,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 3,
-    backgroundColor: '#DC2626',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#EF4444',
-  },
-  discountBadgeText: {
-    color: '#FFFFFF',
-    fontSize: 11,
-    fontWeight: '800',
-    letterSpacing: 0.3,
-  },
-  discountPriceRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  strikeOriginalPrice: {
-    fontSize: 11,
-    color: '#94A3B8',
-    textDecorationLine: 'line-through',
-    fontWeight: '600',
-  },
-  discountPill: {
-    backgroundColor: '#FEF2F2',
-    borderColor: '#FECACA',
-    borderWidth: 1,
-    paddingHorizontal: 7,
-    paddingVertical: 2,
+    paddingVertical: 5,
     borderRadius: 6,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.15,
+    shadowRadius: 3,
+    elevation: 3,
   },
-  discountPillText: {
-    color: '#DC2626',
+  webCategoryPillText: {
+    color: '#0F172A',
     fontSize: 11,
     fontWeight: '800',
+    letterSpacing: 0.4,
   },
-  priceBadgeText: {
+  webDocIconBox: {
+    position: 'absolute',
+    bottom: 12,
+    left: 12,
+    width: 36,
+    height: 36,
+    borderRadius: 8,
+    backgroundColor: '#FFFFFF',
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.15,
+    shadowRadius: 3,
+    elevation: 3,
+  },
+  webLessonsPill: {
+    position: 'absolute',
+    bottom: 12,
+    right: 12,
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 6,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.15,
+    shadowRadius: 3,
+    elevation: 3,
+  },
+  webLessonsPillText: {
+    color: '#0F172A',
     fontSize: 12,
     fontWeight: '800',
-    letterSpacing: 0.3,
   },
-  priceBadgeTextFree: {
-    color: '#059669',
-  },
-  priceBadgeTextPaid: {
-    color: '#FFFFFF',
-  },
-  cardContent: {
+  webCardContent: {
     padding: 16,
   },
-  badgeRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginBottom: 8,
-    flexWrap: 'wrap',
-  },
-  eyebrowBadge: {
-    alignSelf: 'flex-start',
-    backgroundColor: '#ECFEFF',
-    borderColor: '#A5F3FC',
-    borderWidth: 1,
-    paddingHorizontal: 10,
-    paddingVertical: 3,
-    borderRadius: 8,
-  },
-  eyebrowText: {
-    color: Colors.signal,
-    fontSize: 11,
-    fontWeight: '700',
-  },
-  priceInlinePill: {
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 6,
-    borderWidth: 1,
-  },
-  priceInlinePillText: {
-    fontSize: 11,
-    fontWeight: '700',
-  },
-  courseTitle: {
-    color: Colors.textMain,
-    fontSize: 17,
-    fontWeight: '700',
+  webTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: '#0F172A',
     marginBottom: 6,
-    lineHeight: 23,
+    lineHeight: 24,
+    letterSpacing: -0.2,
   },
-  courseDesc: {
-    color: Colors.textSecondary,
+  webDesc: {
     fontSize: 13,
-    lineHeight: 19,
-    marginBottom: 14,
+    lineHeight: 20,
+    color: '#475569',
+    marginBottom: 12,
   },
-  cardFooter: {
+  webMetaRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingTop: 12,
-    borderTopWidth: 1,
-    borderTopColor: Colors.borderSubtle,
+    marginBottom: 12,
   },
-  metaItem: {
+  webMetaLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+  },
+  webMetaItem: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 5,
   },
-  metaText: {
-    color: Colors.textSecondary,
+  webMetaText: {
     fontSize: 12,
     fontWeight: '600',
+    color: '#64748B',
   },
-  enrollStatus: {
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 6,
-    backgroundColor: Colors.surfaceElevated,
+  webRatingWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
   },
-  statusText: {
+  webRatingText: {
     fontSize: 12,
+    fontWeight: '800',
+    color: '#D97706',
+  },
+  webDivider: {
+    height: 1,
+    backgroundColor: '#F1F5F9',
+    marginBottom: 14,
+  },
+  webPricingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 14,
+  },
+  webPriceStack: {
+    justifyContent: 'center',
+  },
+  webStrikePrice: {
+    fontSize: 12,
+    color: '#94A3B8',
+    textDecorationLine: 'line-through',
+    fontWeight: '600',
+    marginBottom: 1,
+  },
+  webMainPrice: {
+    fontSize: 22,
+    fontWeight: '900',
+    color: '#0F172A',
+    letterSpacing: -0.4,
+  },
+  webDiscountPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#ECFDF5',
+    borderColor: '#A7F3D0',
+    borderWidth: 1,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+  },
+  webDiscountPillText: {
+    color: '#0D9488',
+    fontSize: 11,
+    fontWeight: '800',
+  },
+  webCtaButton: {
+    backgroundColor: '#0E7490',
+    borderRadius: 8,
+    paddingVertical: 12,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 6,
+  },
+  webCtaText: {
+    color: '#FFFFFF',
+    fontSize: 14,
     fontWeight: '700',
   },
   centerContainer: {

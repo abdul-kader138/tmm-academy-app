@@ -12,9 +12,6 @@ export interface CoursePricingInfo {
 
 export function formatEuros(cents: number, symbol: string = '€'): string {
   const amount = cents / 100;
-  if (amount % 1 === 0) {
-    return `${symbol}${amount.toLocaleString('en-US')}`;
-  }
   return `${symbol}${amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
