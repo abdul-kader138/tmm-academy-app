@@ -3,23 +3,23 @@
     "name": "TMM Academy",
     "slug": "tmm-academy-app",
     "owner": "tasnikursifat",
-    "version": "1.0.1",
+    "version": "1.0.2",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
-    "userInterfaceStyle": "dark",
+    "userInterfaceStyle": "light",
     "androidStatusBar": {
       "translucent": true,
       "backgroundColor": "#00000000"
     },
     "androidNavigationBar": {
-      "barStyle": "light-content",
-      "backgroundColor": "#0f172a",
+      "barStyle": "dark-content",
+      "backgroundColor": "#ffffff",
       "visible": "always"
     },
     "splash": {
       "image": "./assets/splash.png",
       "resizeMode": "contain",
-      "backgroundColor": "#0f172a"
+      "backgroundColor": "#ffffff"
     },
     "ios": {
       "supportsTablet": true,
@@ -31,10 +31,10 @@
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#0f172a"
+        "backgroundColor": "#ffffff"
       },
       "package": "com.tmminnovation.academy",
-      "versionCode": 2
+      "versionCode": 3
     },
     "web": {
       "favicon": "./assets/favicon.png"
