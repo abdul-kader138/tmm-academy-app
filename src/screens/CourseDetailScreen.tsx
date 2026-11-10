@@ -417,12 +417,6 @@ export const CourseDetailScreen: React.FC<{ route: any; navigation: any }> = ({
           },
         ]}
       >
-        <LinearGradient
-          colors={['#FFFFFF', '#F8FAFC', '#F1F5F9']}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 0, y: 1 }}
-          style={StyleSheet.absoluteFill}
-        />
         <View style={styles.statusCol}>
           <Text style={styles.statusLabel}>
             {course.access_expired ? 'Course Status' : course.is_enrolled ? 'Student Status' : 'Course Fee'}
@@ -686,15 +680,14 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 0,
     right: 0,
-    backgroundColor: 'transparent',
-    overflow: 'hidden',
+    backgroundColor: '#FFFFFF',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 20,
     paddingTop: 12,
     borderTopWidth: 1,
-    borderTopColor: '#E2E8F0',
+    borderTopColor: '#F1F5F9',
   },
   statusCol: {
     flex: 1,

@@ -50,26 +50,18 @@ function BottomTabs() {
     <Tab.Navigator
       screenOptions={({ route }) => ({
         headerShown: false,
-        tabBarBackground: () => (
-          <LinearGradient
-            colors={['#FFFFFF', '#F8FAFC', '#F1F5F9']}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 0, y: 1 }}
-            style={StyleSheet.absoluteFill}
-          />
-        ),
         tabBarStyle: {
-          backgroundColor: 'transparent',
+          backgroundColor: '#FFFFFF',
           borderTopWidth: 1,
-          borderTopColor: '#E2E8F0',
+          borderTopColor: '#F1F5F9',
           height: tabHeight,
           paddingBottom: bottomPadding,
           paddingTop: 8,
-          elevation: 6,
+          elevation: 4,
           shadowColor: '#0F172A',
-          shadowOffset: { width: 0, height: -3 },
-          shadowOpacity: 0.06,
-          shadowRadius: 8,
+          shadowOffset: { width: 0, height: -2 },
+          shadowOpacity: 0.05,
+          shadowRadius: 6,
         },
         tabBarActiveTintColor: Colors.signal,
         tabBarInactiveTintColor: Colors.textMuted,

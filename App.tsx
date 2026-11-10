@@ -11,7 +11,7 @@ import { Colors } from './src/theme/colors';
 export default function App() {
   return (
     <SafeAreaProvider>
-      <View style={{ flex: 1, backgroundColor: Colors.canvas }}>
+      <View style={{ flex: 1, backgroundColor: Colors.surface }}>
         <StatusBar style="dark" />
         {Platform.OS === 'android' && (
           <NavigationBar style="light" />
