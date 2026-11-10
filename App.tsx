@@ -13,7 +13,7 @@ export default function App() {
       <View style={{ flex: 1, backgroundColor: Colors.canvas }}>
         <StatusBar style="dark" />
         {Platform.OS === 'android' && (
-          <NavigationBar style="dark" />
+          <NavigationBar style="light" />
         )}
         <AuthProvider>
           <RootNavigator />

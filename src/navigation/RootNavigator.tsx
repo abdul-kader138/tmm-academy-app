@@ -1,10 +1,11 @@
 import React from 'react';
-import { Platform, View, ActivityIndicator } from 'react-native';
+import { Platform, View, ActivityIndicator, StyleSheet } from 'react-native';
 import { NavigationContainer, DefaultTheme } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { Colors } from '../theme/colors';
 import { useAuth } from '../context/AuthContext';
 
@@ -49,18 +50,26 @@ function BottomTabs() {
     <Tab.Navigator
       screenOptions={({ route }) => ({
         headerShown: false,
+        tabBarBackground: () => (
+          <LinearGradient
+            colors={['#FFFFFF', '#F8FAFC', '#F1F5F9']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 0, y: 1 }}
+            style={StyleSheet.absoluteFill}
+          />
+        ),
         tabBarStyle: {
-          backgroundColor: Colors.surface,
+          backgroundColor: 'transparent',
           borderTopWidth: 1,
-          borderTopColor: Colors.borderSubtle,
+          borderTopColor: '#E2E8F0',
           height: tabHeight,
           paddingBottom: bottomPadding,
           paddingTop: 8,
-          elevation: 4,
+          elevation: 6,
           shadowColor: '#0F172A',
-          shadowOffset: { width: 0, height: -2 },
-          shadowOpacity: 0.05,
-          shadowRadius: 6,
+          shadowOffset: { width: 0, height: -3 },
+          shadowOpacity: 0.06,
+          shadowRadius: 8,
         },
         tabBarActiveTintColor: Colors.signal,
         tabBarInactiveTintColor: Colors.textMuted,

@@ -17,15 +17,27 @@ import { useFocusEffect } from '@react-navigation/native';
 import { Colors, cardShadow } from '../theme/colors';
 import { lmsApi, API_BASE_URL } from '../api/lmsApi';
 import { CourseCatalogItem } from '../api/types';
+import { useAuth } from '../context/AuthContext';
 import { getCoursePricing } from '../utils/pricing';
 import { cleanHtml } from '../utils/text';
 
 export const CourseCatalogScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   const insets = useSafeAreaInsets();
+  const { user } = useAuth();
   const [courses, setCourses] = useState<CourseCatalogItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+
+  const handleGoBack = () => {
+    if (navigation.canGoBack()) {
+      navigation.goBack();
+    } else if (user) {
+      navigation.navigate('MainTabs', { screen: 'DashboardTab' });
+    } else {
+      navigation.navigate('Welcome');
+    }
+  };
 
   const fetchCourses = useCallback(async (isSilent = false) => {
     if (!isSilent) setLoading(true);
@@ -192,8 +204,20 @@ export const CourseCatalogScreen: React.FC<{ navigation: any }> = ({ navigation 
           },
         ]}
       >
-        <Text style={styles.screenTitle}>Explore Courses</Text>
-        <Text style={styles.screenSubtitle}>Practical tracks for career advancement</Text>
+        <View style={styles.headerTopRow}>
+          <TouchableOpacity
+            style={styles.backButton}
+            onPress={handleGoBack}
+            activeOpacity={0.7}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          >
+            <Ionicons name="arrow-back" size={20} color={Colors.textMain} />
+          </TouchableOpacity>
+          <View style={styles.headerTitleWrap}>
+            <Text style={styles.screenTitle}>Explore Courses</Text>
+            <Text style={styles.screenSubtitle}>Practical tracks for career advancement</Text>
+          </View>
+        </View>
 
         {/* Search Bar */}
         <View style={styles.searchContainer}>
@@ -261,17 +285,35 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: Colors.borderSubtle,
   },
+  headerTopRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  backButton: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: Colors.surfaceElevated,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+    borderWidth: 1,
+    borderColor: Colors.borderSubtle,
+  },
+  headerTitleWrap: {
+    flex: 1,
+  },
   screenTitle: {
     color: Colors.textMain,
-    fontSize: 22,
+    fontSize: 20,
     fontWeight: '800',
     letterSpacing: -0.3,
   },
   screenSubtitle: {
     color: Colors.textSecondary,
-    fontSize: 13,
+    fontSize: 12,
     marginTop: 2,
-    marginBottom: 12,
   },
   searchContainer: {
     flexDirection: 'row',
