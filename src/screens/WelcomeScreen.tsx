@@ -250,10 +250,12 @@ export const WelcomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => 
               const durationHours = Math.round((item.duration_minutes || 0) / 60);
               const durationText =
                 durationHours > 0
-                  ? `${durationHours}h`
+                  ? `${durationHours} hrs`
                   : item.duration_minutes > 0
-                  ? `${item.duration_minutes}m`
+                  ? `${item.duration_minutes} mins`
                   : 'Self-paced';
+              const modulesText = `${item.lessons_count || 3} Modules`;
+              const ratingText = `${(item as any).rating || (item as any).average_rating || '4.9'} ★`;
 
               const imageUrl = item.cover_image_url?.startsWith('http')
                 ? item.cover_image_url
@@ -300,15 +302,14 @@ export const WelcomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => 
                       <View style={styles.trackMeta}>
                         <Ionicons name="time-outline" size={13} color={Colors.textMuted} />
                         <Text style={styles.trackMetaText}>{durationText}</Text>
-                        <Text style={styles.trackMetaDot}>•</Text>
-                        <Ionicons name="play-circle-outline" size={13} color={Colors.signal} />
-                        <Text style={styles.trackMetaText}>{item.lessons_count || 0} Lessons</Text>
                       </View>
 
-                      <View style={styles.trackActionBtn}>
-                        <Text style={styles.trackActionBtnText}>View</Text>
-                        <Ionicons name="arrow-forward" size={12} color="#FFFFFF" />
+                      <View style={styles.trackMeta}>
+                        <Ionicons name="play-circle-outline" size={13} color={Colors.signal} />
+                        <Text style={styles.trackMetaText}>{modulesText}</Text>
                       </View>
+
+                      <Text style={styles.trackRating}>{ratingText}</Text>
                     </View>
                   </View>
                 </TouchableOpacity>
@@ -653,33 +654,15 @@ const styles = StyleSheet.create({
   trackMeta: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 5,
-  },
-  trackMetaText: {
-    fontSize: 12,
-    color: Colors.textSecondary,
-    fontWeight: '500',
-  },
-  trackMetaDot: {
-    fontSize: 11,
-    color: '#CBD5E1',
-  },
-  trackActionBtn: {
-    backgroundColor: '#0E7490',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 6,
-    flexDirection: 'row',
-    alignItems: 'center',
     gap: 4,
   },
-  trackActionBtnText: {
-    color: '#FFFFFF',
-    fontSize: 11,
-    fontWeight: '700',
+  trackMetaText: {
+    fontSize: 11.5,
+    color: Colors.textMuted,
+    fontWeight: '600',
   },
   trackRating: {
-    fontSize: 11,
+    fontSize: 11.5,
     fontWeight: '800',
     color: Colors.star,
   },
