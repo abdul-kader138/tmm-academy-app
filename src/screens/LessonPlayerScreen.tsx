@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -10,6 +10,8 @@ import {
   Alert,
   TextInput,
   Linking,
+  PanResponder,
+  Dimensions,
 } from 'react-native';
 import { WebView } from 'react-native-webview';
 import { Ionicons } from '@expo/vector-icons';
@@ -170,6 +172,10 @@ function parseVideo(
 
 function generateVideoHtml(parsed: ParsedVideo, rawCode?: string | null): string | null {
   if (parsed.type === 'youtube' && parsed.embedUrl) {
+    const embedUrl = parsed.embedUrl.includes('enablejsapi=1')
+      ? parsed.embedUrl
+      : `${parsed.embedUrl}${parsed.embedUrl.includes('?') ? '&' : '?'}enablejsapi=1&playsinline=1&controls=1&modestbranding=1`;
+
     return `
       <!DOCTYPE html>
       <html>
@@ -182,22 +188,65 @@ function generateVideoHtml(parsed: ParsedVideo, rawCode?: string | null): string
             .player-wrap { position: relative; width: 100vw; height: 100vh; }
             iframe { position: absolute; top: 0; left: 0; width: 100vw; height: 100vh; border: 0; }
           </style>
+          <script src="https://www.youtube.com/iframe_api"></script>
         </head>
         <body>
           <div class="player-wrap">
             <iframe
-              src="${parsed.embedUrl}"
+              id="player_yt"
+              src="${embedUrl}"
               frameborder="0"
               allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share; fullscreen"
               allowfullscreen
             ></iframe>
           </div>
+          <script>
+            var ytPlayer;
+            function onYouTubeIframeAPIReady() {
+              ytPlayer = new YT.Player('player_yt', {
+                events: {
+                  'onReady': function() {}
+                }
+              });
+            }
+            window.handlePlayerCommand = function(cmd) {
+              if (!ytPlayer) return;
+              try {
+                if (cmd.action === 'seek') {
+                  var cur = (ytPlayer.getCurrentTime && typeof ytPlayer.getCurrentTime === 'function') ? ytPlayer.getCurrentTime() : 0;
+                  ytPlayer.seekTo(Math.max(0, cur + cmd.offset), true);
+                } else if (cmd.action === 'setSpeed') {
+                  if (ytPlayer.setPlaybackRate) ytPlayer.setPlaybackRate(cmd.speed);
+                } else if (cmd.action === 'setVolume') {
+                  if (ytPlayer.setVolume) ytPlayer.setVolume(Math.round(cmd.volume * 100));
+                } else if (cmd.action === 'play') {
+                  if (ytPlayer.playVideo) ytPlayer.playVideo();
+                } else if (cmd.action === 'pause') {
+                  if (ytPlayer.pauseVideo) ytPlayer.pauseVideo();
+                } else if (cmd.action === 'togglePlay') {
+                  var state = (ytPlayer.getPlayerState && typeof ytPlayer.getPlayerState === 'function') ? ytPlayer.getPlayerState() : 1;
+                  if (state === 1) ytPlayer.pauseVideo();
+                  else ytPlayer.playVideo();
+                }
+              } catch(e) {}
+            };
+            document.addEventListener('message', function(e) {
+              try { window.handlePlayerCommand(JSON.parse(e.data)); } catch(err){}
+            });
+            window.addEventListener('message', function(e) {
+              try { window.handlePlayerCommand(JSON.parse(e.data)); } catch(err){}
+            });
+          </script>
         </body>
       </html>
     `;
   }
 
   if (parsed.type === 'vimeo' && parsed.embedUrl) {
+    const embedUrl = parsed.embedUrl.includes('controls=')
+      ? parsed.embedUrl
+      : `${parsed.embedUrl}${parsed.embedUrl.includes('?') ? '&' : '?'}controls=1&speed=1&pip=1&playsinline=1&transparent=0&dnt=1`;
+
     return `
       <!DOCTYPE html>
       <html>
@@ -210,16 +259,54 @@ function generateVideoHtml(parsed: ParsedVideo, rawCode?: string | null): string
             .player-wrap { position: relative; width: 100vw; height: 100vh; }
             iframe { position: absolute; top: 0; left: 0; width: 100vw; height: 100vh; border: 0; }
           </style>
+          <script src="https://player.vimeo.com/api/player.js"></script>
         </head>
         <body>
           <div class="player-wrap">
             <iframe
-              src="${parsed.embedUrl}"
+              id="player_vimeo"
+              src="${embedUrl}"
               frameborder="0"
               allow="autoplay; fullscreen; picture-in-picture"
               allowfullscreen
             ></iframe>
           </div>
+          <script>
+            var vimeoPlayer;
+            try {
+              vimeoPlayer = new Vimeo.Player('player_vimeo');
+            } catch(e) {}
+
+            window.handlePlayerCommand = function(cmd) {
+              if (!vimeoPlayer) return;
+              try {
+                if (cmd.action === 'seek') {
+                  vimeoPlayer.getCurrentTime().then(function(t) {
+                    vimeoPlayer.setCurrentTime(Math.max(0, t + cmd.offset));
+                  });
+                } else if (cmd.action === 'setSpeed') {
+                  vimeoPlayer.setPlaybackRate(cmd.speed);
+                } else if (cmd.action === 'setVolume') {
+                  vimeoPlayer.setVolume(Math.max(0, Math.min(1, cmd.volume)));
+                } else if (cmd.action === 'play') {
+                  vimeoPlayer.play();
+                } else if (cmd.action === 'pause') {
+                  vimeoPlayer.pause();
+                } else if (cmd.action === 'togglePlay') {
+                  vimeoPlayer.getPaused().then(function(paused) {
+                    if (paused) vimeoPlayer.play();
+                    else vimeoPlayer.pause();
+                  });
+                }
+              } catch(e) {}
+            };
+            document.addEventListener('message', function(e) {
+              try { window.handlePlayerCommand(JSON.parse(e.data)); } catch(err){}
+            });
+            window.addEventListener('message', function(e) {
+              try { window.handlePlayerCommand(JSON.parse(e.data)); } catch(err){}
+            });
+          </script>
         </body>
       </html>
     `;
@@ -233,12 +320,13 @@ function generateVideoHtml(parsed: ParsedVideo, rawCode?: string | null): string
           <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
           <style>
             * { margin: 0; padding: 0; box-sizing: border-box; }
-            body, html { width: 100%; height: 100%; background: #000; overflow: hidden; display: flex; align-items: center; justify-content: center; }
-            video { width: 100%; height: 100%; object-fit: contain; }
+            body, html { width: 100vw; height: 100vh; min-height: 100vh; background: #000; overflow: hidden; display: flex; align-items: center; justify-content: center; }
+            video { width: 100vw; height: 100vh; object-fit: contain; }
           </style>
         </head>
         <body>
           <video
+            id="player_direct"
             src="${parsed.embedUrl}"
             controls
             autoplay
@@ -246,6 +334,34 @@ function generateVideoHtml(parsed: ParsedVideo, rawCode?: string | null): string
             webkit-playsinline
             preload="auto"
           ></video>
+          <script>
+            var videoEl = document.getElementById('player_direct');
+            window.handlePlayerCommand = function(cmd) {
+              if (!videoEl) return;
+              try {
+                if (cmd.action === 'seek') {
+                  videoEl.currentTime = Math.max(0, videoEl.currentTime + cmd.offset);
+                } else if (cmd.action === 'setSpeed') {
+                  videoEl.playbackRate = cmd.speed;
+                } else if (cmd.action === 'setVolume') {
+                  videoEl.volume = Math.max(0, Math.min(1, cmd.volume));
+                } else if (cmd.action === 'play') {
+                  videoEl.play();
+                } else if (cmd.action === 'pause') {
+                  videoEl.pause();
+                } else if (cmd.action === 'togglePlay') {
+                  if (videoEl.paused) videoEl.play();
+                  else videoEl.pause();
+                }
+              } catch(e) {}
+            };
+            document.addEventListener('message', function(e) {
+              try { window.handlePlayerCommand(JSON.parse(e.data)); } catch(err){}
+            });
+            window.addEventListener('message', function(e) {
+              try { window.handlePlayerCommand(JSON.parse(e.data)); } catch(err){}
+            });
+          </script>
         </body>
       </html>
     `;
@@ -261,8 +377,8 @@ function generateVideoHtml(parsed: ParsedVideo, rawCode?: string | null): string
           <meta name="referrer" content="always">
           <style>
             * { margin: 0; padding: 0; box-sizing: border-box; }
-            body, html { width: 100%; height: 100%; background: #000; overflow: hidden; display: flex; align-items: center; justify-content: center; }
-            iframe { width: 100%; height: 100%; border: 0; }
+            body, html { width: 100vw; height: 100vh; min-height: 100vh; background: #000; overflow: hidden; display: flex; align-items: center; justify-content: center; }
+            iframe { width: 100vw; height: 100vh; border: 0; }
           </style>
         </head>
         <body>
@@ -296,6 +412,92 @@ export const LessonPlayerScreen: React.FC<{ route: any; navigation: any }> = ({
   const [comments, setComments] = useState<any[]>([]);
   const [newCommentText, setNewCommentText] = useState('');
   const [postingComment, setPostingComment] = useState(false);
+
+  // --- Universal Player State & Gestures ---
+  const webViewRef = useRef<any>(null);
+  const [currentSpeed, setCurrentSpeed] = useState(1.0);
+  const [isPlaying, setIsPlaying] = useState(true);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+
+  // Gesture Brightness (0.2 to 1.0) & Volume (0.0 to 1.0)
+  const [brightness, setBrightness] = useState(1.0);
+  const [volume, setVolume] = useState(1.0);
+  const [hudState, setHudState] = useState<{ type: 'brightness' | 'volume' | null; value: number }>({
+    type: null,
+    value: 1.0,
+  });
+  const hudTimerRef = useRef<any>(null);
+
+  const dragStartBrightnessRef = useRef(1.0);
+  const dragStartVolumeRef = useRef(1.0);
+  const dragSideRef = useRef<'left' | 'right'>('left');
+  const containerDimensionsRef = useRef({
+    width: Dimensions.get('window').width,
+    height: 240,
+  });
+
+  const sendPlayerCommand = useCallback((cmd: { action: string; [key: string]: any }) => {
+    const code = `if (window.handlePlayerCommand) { window.handlePlayerCommand(${JSON.stringify(cmd)}); } true;`;
+    webViewRef.current?.injectJavaScript(code);
+  }, []);
+
+  const handleSeek = useCallback(
+    (offset: number) => {
+      sendPlayerCommand({ action: 'seek', offset });
+    },
+    [sendPlayerCommand]
+  );
+
+  const handleTogglePlay = useCallback(() => {
+    setIsPlaying((prev) => !prev);
+    sendPlayerCommand({ action: 'togglePlay' });
+  }, [sendPlayerCommand]);
+
+  const speedCycle = [1.0, 1.25, 1.5, 2.0, 0.75];
+  const handleCycleSpeed = useCallback(() => {
+    const nextIndex = (speedCycle.indexOf(currentSpeed) + 1) % speedCycle.length;
+    const nextSpeed = speedCycle[nextIndex];
+    setCurrentSpeed(nextSpeed);
+    sendPlayerCommand({ action: 'setSpeed', speed: nextSpeed });
+  }, [currentSpeed, sendPlayerCommand]);
+
+  const panResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => isFullscreen,
+      onMoveShouldSetPanResponder: (_, gestureState) => isFullscreen && Math.abs(gestureState.dy) > 5,
+      onPanResponderGrant: (evt) => {
+        const { locationX } = evt.nativeEvent;
+        const width = containerDimensionsRef.current.width || Dimensions.get('window').width;
+        dragSideRef.current = locationX < width / 2 ? 'left' : 'right';
+        dragStartBrightnessRef.current = brightness;
+        dragStartVolumeRef.current = volume;
+
+        if (hudTimerRef.current) {
+          clearTimeout(hudTimerRef.current);
+          hudTimerRef.current = null;
+        }
+      },
+      onPanResponderMove: (_, gestureState) => {
+        const delta = -gestureState.dy / 180;
+        if (dragSideRef.current === 'left') {
+          const next = Math.min(1.0, Math.max(0.2, dragStartBrightnessRef.current + delta));
+          setBrightness(next);
+          setHudState({ type: 'brightness', value: next });
+        } else {
+          const next = Math.min(1.0, Math.max(0.0, dragStartVolumeRef.current + delta));
+          setVolume(next);
+          setHudState({ type: 'volume', value: next });
+          sendPlayerCommand({ action: 'setVolume', volume: next });
+        }
+      },
+      onPanResponderRelease: () => {
+        if (hudTimerRef.current) clearTimeout(hudTimerRef.current);
+        hudTimerRef.current = setTimeout(() => {
+          setHudState({ type: null, value: 0 });
+        }, 1200);
+      },
+    })
+  ).current;
 
   // Load course details
   useEffect(() => {
@@ -535,8 +737,49 @@ export const LessonPlayerScreen: React.FC<{ route: any; navigation: any }> = ({
         <View style={{ width: 40 }} />
       </View>
 
-      {/* Video Container (Fixed 16:9 ratio) */}
-      <View style={styles.videoPlayerContainer}>
+      {/* Video Container (Fixed 16:9 or Fullscreen) */}
+      <View
+        style={[
+          styles.videoPlayerContainer,
+          isFullscreen && styles.fullscreenContainer,
+        ]}
+        onLayout={(e) => {
+          containerDimensionsRef.current = e.nativeEvent.layout;
+        }}
+        {...panResponder.panHandlers}
+      >
+        {/* Fullscreen Top Header */}
+        {isFullscreen && (
+          <View style={styles.fullscreenHeaderRow}>
+            <TouchableOpacity
+              style={styles.fullscreenBackBtn}
+              onPress={() => setIsFullscreen(false)}
+              activeOpacity={0.7}
+            >
+              <Ionicons name="arrow-back" size={22} color="#FFFFFF" />
+            </TouchableOpacity>
+            <Text style={styles.fullscreenLessonTitle} numberOfLines={1}>
+              {lesson?.title || 'Lesson Video'}
+            </Text>
+            <TouchableOpacity
+              style={styles.fullscreenBackBtn}
+              onPress={() => setIsFullscreen(false)}
+              activeOpacity={0.7}
+            >
+              <Ionicons name="contract" size={20} color="#FFFFFF" />
+            </TouchableOpacity>
+          </View>
+        )}
+
+        {/* Fullscreen Gesture Guidance Hint */}
+        {isFullscreen && (
+          <View pointerEvents="none" style={styles.gestureHintPill}>
+            <Text style={styles.gestureHintText}>
+              👈 Slide left for Brightness • Slide right for Volume 👉
+            </Text>
+          </View>
+        )}
+
         {loadingLesson ? (
           <View style={styles.videoPlaceholder}>
             <ActivityIndicator size="large" color={Colors.signal} />
@@ -599,24 +842,13 @@ export const LessonPlayerScreen: React.FC<{ route: any; navigation: any }> = ({
             )
           ) : (
             <WebView
+              ref={webViewRef}
               key={`video_${currentLessonId}_${retryKey}`}
               originWhitelist={['*']}
-              source={
-                parsedVideo.isIframeCode
-                  ? { html: videoEmbedHtml, baseUrl: 'https://academy.tmminnovation.com' }
-                  : parsedVideo.embedUrl
-                  ? {
-                      uri: parsedVideo.embedUrl,
-                      headers: {
-                        Referer: 'https://academy.tmminnovation.com/',
-                        Origin: 'https://academy.tmminnovation.com',
-                      },
-                    }
-                  : {
-                      html: videoEmbedHtml,
-                      baseUrl: 'https://academy.tmminnovation.com',
-                    }
-              }
+              source={{
+                html: videoEmbedHtml,
+                baseUrl: 'https://academy.tmminnovation.com',
+              }}
               style={styles.webview}
               allowsFullscreenVideo
               javaScriptEnabled
@@ -629,12 +861,12 @@ export const LessonPlayerScreen: React.FC<{ route: any; navigation: any }> = ({
               setSupportMultipleWindows={false}
               javaScriptCanOpenWindowsAutomatically={false}
               userAgent="Mozilla/5.0 (Linux; Android 14; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Mobile Safari/537.36"
-              onError={(syntheticEvent) => {
+              onError={(syntheticEvent: any) => {
                 const { nativeEvent } = syntheticEvent;
                 console.warn('[WebView Error]', nativeEvent);
                 setPlaybackError(nativeEvent.description || 'Playback failed to load');
               }}
-              onHttpError={(syntheticEvent) => {
+              onHttpError={(syntheticEvent: any) => {
                 const { nativeEvent } = syntheticEvent;
                 if (nativeEvent.statusCode >= 400) {
                   console.warn('[WebView HttpError]', nativeEvent.statusCode);
@@ -675,7 +907,120 @@ export const LessonPlayerScreen: React.FC<{ route: any; navigation: any }> = ({
             </View>
           </View>
         )}
+
+        {/* In-Player Brightness Dimming Overlay */}
+        <View
+          pointerEvents="none"
+          style={[
+            StyleSheet.absoluteFill,
+            {
+              backgroundColor: '#000000',
+              opacity: Math.max(0, 1 - brightness),
+              zIndex: 10,
+            },
+          ]}
+        />
+
+        {/* Floating HUD Indicator (Brightness & Volume) */}
+        {hudState.type && (
+          <View pointerEvents="none" style={styles.hudOverlay}>
+            <View style={styles.hudCard}>
+              <Ionicons
+                name={
+                  hudState.type === 'brightness'
+                    ? hudState.value > 0.5 ? 'sunny' : 'sunny-outline'
+                    : hudState.value === 0 ? 'volume-mute' : hudState.value < 0.5 ? 'volume-low' : 'volume-high'
+                }
+                size={30}
+                color="#FFFFFF"
+              />
+              <Text style={styles.hudText}>
+                {hudState.type === 'brightness' ? 'Brightness' : 'Volume'}
+              </Text>
+              <View style={styles.hudProgressBarTrack}>
+                <View style={[styles.hudProgressBarFill, { width: `${Math.round(hudState.value * 100)}%` }]} />
+              </View>
+              <Text style={styles.hudPercentText}>{Math.round(hudState.value * 100)}%</Text>
+            </View>
+          </View>
+        )}
+
+        {/* Fullscreen Floating Bottom Controls */}
+        {isFullscreen && videoEmbedHtml && (
+          <View style={styles.fullscreenControlsRow}>
+            <TouchableOpacity style={styles.fsActionBtn} onPress={() => handleSeek(-10)} activeOpacity={0.7}>
+              <Ionicons name="play-back" size={18} color="#FFFFFF" />
+              <Text style={styles.fsActionBtnText}>-10s</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity style={styles.fsPlayBtn} onPress={handleTogglePlay} activeOpacity={0.8}>
+              <Ionicons name={isPlaying ? 'pause' : 'play'} size={22} color="#FFFFFF" />
+            </TouchableOpacity>
+
+            <TouchableOpacity style={styles.fsActionBtn} onPress={() => handleSeek(10)} activeOpacity={0.7}>
+              <Ionicons name="play-forward" size={18} color="#FFFFFF" />
+              <Text style={styles.fsActionBtnText}>+10s</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity style={styles.fsSpeedBtn} onPress={handleCycleSpeed} activeOpacity={0.7}>
+              <Text style={styles.fsSpeedBtnText}>{currentSpeed}x</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity style={styles.fsActionBtn} onPress={() => setIsFullscreen(false)} activeOpacity={0.7}>
+              <Ionicons name="contract" size={20} color="#FFFFFF" />
+            </TouchableOpacity>
+          </View>
+        )}
       </View>
+
+      {/* Normal Mode Quick Controls Bar (Directly below video) */}
+      {!isFullscreen && videoEmbedHtml && (
+        <View style={styles.quickControlsBar}>
+          <TouchableOpacity
+            style={styles.quickCtrlBtn}
+            onPress={() => handleSeek(-10)}
+            activeOpacity={0.7}
+          >
+            <Ionicons name="play-back" size={15} color="#E2E8F0" />
+            <Text style={styles.quickCtrlBtnText}>10s</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.quickCtrlBtn, styles.quickPlayBtn]}
+            onPress={handleTogglePlay}
+            activeOpacity={0.8}
+          >
+            <Ionicons name={isPlaying ? 'pause' : 'play'} size={17} color="#FFFFFF" />
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.quickCtrlBtn}
+            onPress={() => handleSeek(10)}
+            activeOpacity={0.7}
+          >
+            <Ionicons name="play-forward" size={15} color="#E2E8F0" />
+            <Text style={styles.quickCtrlBtnText}>10s</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.quickCtrlBtn, styles.quickSpeedBtn]}
+            onPress={handleCycleSpeed}
+            activeOpacity={0.7}
+          >
+            <Ionicons name="speedometer-outline" size={14} color="#38BDF8" />
+            <Text style={styles.quickSpeedBtnText}>{currentSpeed}x</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.quickCtrlBtn, styles.quickFsBtn]}
+            onPress={() => setIsFullscreen(true)}
+            activeOpacity={0.7}
+          >
+            <Ionicons name="expand" size={16} color="#38BDF8" />
+            <Text style={styles.quickFsBtnText}>Fullscreen</Text>
+          </TouchableOpacity>
+        </View>
+      )}
 
       {/* Content Scroll View */}
       <ScrollView
@@ -1699,6 +2044,199 @@ const styles = StyleSheet.create({
   lessonItemTime: {
     fontSize: 11,
     color: Colors.textMuted,
+    fontWeight: '600',
+  },
+  quickControlsBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#0F172A',
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#1E293B',
+  },
+  quickCtrlBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
+    backgroundColor: '#1E293B',
+  },
+  quickCtrlBtnText: {
+    color: '#E2E8F0',
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  quickPlayBtn: {
+    backgroundColor: Colors.signal,
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+  },
+  quickSpeedBtn: {
+    backgroundColor: 'rgba(14, 116, 144, 0.2)',
+    borderWidth: 1,
+    borderColor: Colors.signal,
+  },
+  quickSpeedBtnText: {
+    color: '#38BDF8',
+    fontSize: 12,
+    fontWeight: '800',
+  },
+  quickFsBtn: {
+    backgroundColor: 'rgba(14, 116, 144, 0.2)',
+    borderWidth: 1,
+    borderColor: Colors.signal,
+  },
+  quickFsBtnText: {
+    color: '#38BDF8',
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  fullscreenContainer: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    width: '100%',
+    height: '100%',
+    zIndex: 99999,
+    backgroundColor: '#000000',
+    aspectRatio: undefined,
+  },
+  fullscreenHeaderRow: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 60,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    zIndex: 30,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+  },
+  fullscreenBackBtn: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  fullscreenLessonTitle: {
+    flex: 1,
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '700',
+    marginHorizontal: 12,
+  },
+  fullscreenControlsRow: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: 64,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-around',
+    paddingHorizontal: 20,
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    zIndex: 30,
+  },
+  fsActionBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+    backgroundColor: 'rgba(255,255,255,0.15)',
+  },
+  fsActionBtnText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  fsPlayBtn: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: Colors.signal,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  fsSpeedBtn: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+    backgroundColor: 'rgba(14, 116, 144, 0.4)',
+    borderWidth: 1,
+    borderColor: '#38BDF8',
+  },
+  fsSpeedBtnText: {
+    color: '#38BDF8',
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  hudOverlay: {
+    ...StyleSheet.absoluteFill,
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 25,
+  },
+  hudCard: {
+    backgroundColor: 'rgba(15, 23, 42, 0.9)',
+    borderRadius: 16,
+    paddingVertical: 16,
+    paddingHorizontal: 24,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.15)',
+    minWidth: 140,
+  },
+  hudText: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontWeight: '700',
+    marginTop: 6,
+  },
+  hudProgressBarTrack: {
+    width: 100,
+    height: 5,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    borderRadius: 3,
+    marginTop: 8,
+    overflow: 'hidden',
+  },
+  hudProgressBarFill: {
+    height: '100%',
+    backgroundColor: Colors.signal,
+    borderRadius: 3,
+  },
+  hudPercentText: {
+    color: '#94A3B8',
+    fontSize: 11,
+    fontWeight: '700',
+    marginTop: 4,
+  },
+  gestureHintPill: {
+    position: 'absolute',
+    top: 68,
+    alignSelf: 'center',
+    backgroundColor: 'rgba(0,0,0,0.65)',
+    paddingHorizontal: 14,
+    paddingVertical: 5,
+    borderRadius: 14,
+    zIndex: 20,
+  },
+  gestureHintText: {
+    color: '#CBD5E1',
+    fontSize: 11,
     fontWeight: '600',
   },
 });
