@@ -592,6 +592,15 @@ class LmsApiClient {
     if (!res.data) return null;
     const lesson = res.data.lesson || res.data.data || res.data;
     if (lesson && typeof lesson === 'object') {
+      if (!lesson.video_url) {
+        lesson.video_url =
+          lesson.video_link ||
+          lesson.video ||
+          lesson.embed_url ||
+          lesson.embed_code ||
+          lesson.stream_url ||
+          null;
+      }
       if (Array.isArray(res.data.comments)) {
         lesson.comments = res.data.comments;
       }

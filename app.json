@@ -3,7 +3,7 @@
     "name": "TMM Academy",
     "slug": "tmm-academy-app",
     "owner": "tasnikursifat",
-    "version": "1.0.4",
+    "version": "1.0.5",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
@@ -34,7 +34,7 @@
         "backgroundColor": "#ffffff"
       },
       "package": "com.tmminnovation.academy",
-      "versionCode": 5
+      "versionCode": 6
     },
     "web": {
       "favicon": "./assets/favicon.png"

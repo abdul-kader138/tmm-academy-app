@@ -289,7 +289,7 @@ export const CourseDetailScreen: React.FC<{ route: any; navigation: any }> = ({
                     <TouchableOpacity
                       key={les.id}
                       style={styles.lessonRow}
-                      activeOpacity={course.is_enrolled ? 0.7 : 1}
+                      activeOpacity={0.7}
                       onPress={() => {
                         if (course.is_enrolled) {
                           navigation.navigate('LessonPlayer', {
@@ -297,6 +297,10 @@ export const CourseDetailScreen: React.FC<{ route: any; navigation: any }> = ({
                             lessonId: les.id,
                             courseTitle: course.title,
                           });
+                        } else if (!user) {
+                          navigation.navigate('Login');
+                        } else {
+                          void handleEnroll();
                         }
                       }}
                     >
@@ -402,6 +406,16 @@ export const CourseDetailScreen: React.FC<{ route: any; navigation: any }> = ({
                   })}
                 </View>
               )}
+            </View>
+          ) : !loading ? (
+            <View style={styles.emptySyllabusCard}>
+              <View style={styles.emptySyllabusIcon}>
+                <Ionicons name="film-outline" size={26} color={Colors.signal} />
+              </View>
+              <Text style={styles.emptySyllabusTitle}>Modules Being Uploaded</Text>
+              <Text style={styles.emptySyllabusSub}>
+                The video syllabus and study materials for this course are being prepared by the academy instructors. Check back shortly!
+              </Text>
             </View>
           ) : null}
         </ScrollView>
@@ -759,6 +773,36 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '700',
     color: Colors.signal,
+  },
+  emptySyllabusCard: {
+    backgroundColor: '#F8FAFC',
+    borderRadius: 16,
+    padding: 24,
+    alignItems: 'center',
+    marginTop: 20,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  emptySyllabusIcon: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    backgroundColor: '#ECFEFF',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  emptySyllabusTitle: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: Colors.textMain,
+    marginBottom: 6,
+  },
+  emptySyllabusSub: {
+    fontSize: 13,
+    color: Colors.textSecondary,
+    textAlign: 'center',
+    lineHeight: 19,
   },
   accessExpiredCard: {
     backgroundColor: '#FFFBEB',

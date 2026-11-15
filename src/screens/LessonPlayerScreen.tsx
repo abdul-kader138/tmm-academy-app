@@ -9,6 +9,7 @@ import {
   Platform,
   Alert,
   TextInput,
+  Linking,
 } from 'react-native';
 import { WebView } from 'react-native-webview';
 import { Ionicons } from '@expo/vector-icons';
@@ -23,20 +24,250 @@ import { LessonDetail, CourseDetail, LessonAttachment } from '../api/types';
 import { useAuth } from '../context/AuthContext';
 import { cleanHtml } from '../utils/text';
 
-function extractYouTubeId(urlOrId?: string | null): string | null {
-  if (!urlOrId) return null;
-  const trimmed = urlOrId.trim();
-  if (/^[a-zA-Z0-9_-]{11}$/.test(trimmed)) return trimmed;
-  const match = /(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/|youtube-nocookie\.com\/embed\/)([^"&?\/\s]{11})/i.exec(trimmed);
-  return match ? match[1] : null;
+interface ParsedVideo {
+  type: 'youtube' | 'vimeo' | 'direct' | 'embed' | 'none';
+  embedUrl: string | null;
+  externalUrl: string | null;
+  youtubeId?: string;
+  vimeoId?: string;
+  vimeoHash?: string;
+  isIframeCode?: boolean;
 }
 
-function extractVimeoId(urlOrId?: string | number | null): string | null {
-  if (!urlOrId) return null;
-  const str = String(urlOrId).trim();
-  if (/^\d+$/.test(str)) return str;
-  const match = /vimeo\.com\/(?:channels\/(?:\w+\/)?|groups\/[^\/]*\/videos\/|album\/(?:\d+)\/video\/|video\/|)(\d+)/i.exec(str);
-  return match ? match[1] : null;
+function parseVideo(
+  videoUrl?: string | null,
+  youtubeIdProp?: string | null,
+  vimeoIdProp?: string | number | null
+): ParsedVideo {
+  // 1. Explicit YouTube ID prop
+  const ytProp = (youtubeIdProp || '').trim();
+  if (ytProp && /^[a-zA-Z0-9_-]{11}$/.test(ytProp)) {
+    return {
+      type: 'youtube',
+      youtubeId: ytProp,
+      embedUrl: `https://www.youtube.com/embed/${ytProp}?enablejsapi=1&autoplay=1&playsinline=1&rel=0&modestbranding=1&origin=https://academy.tmminnovation.com`,
+      externalUrl: `https://www.youtube.com/watch?v=${ytProp}`,
+    };
+  }
+
+  // 2. Explicit Vimeo ID prop
+  const vmProp = String(vimeoIdProp || '').trim();
+  if (vmProp && /^\d+$/.test(vmProp)) {
+    return {
+      type: 'vimeo',
+      vimeoId: vmProp,
+      embedUrl: `https://player.vimeo.com/video/${vmProp}?autoplay=1&title=0&byline=0&portrait=0&transparent=0`,
+      externalUrl: `https://vimeo.com/${vmProp}`,
+    };
+  }
+
+  if (!videoUrl || typeof videoUrl !== 'string') {
+    return { type: 'none', embedUrl: null, externalUrl: null };
+  }
+
+  const trimmed = videoUrl.trim();
+  if (!trimmed) {
+    return { type: 'none', embedUrl: null, externalUrl: null };
+  }
+
+  // If input is an iframe code
+  if (trimmed.startsWith('<iframe') && trimmed.includes('src=')) {
+    const srcMatch = trimmed.match(/src=["']([^"']+)["']/i);
+    if (srcMatch && srcMatch[1]) {
+      return parseVideo(srcMatch[1]);
+    }
+    return {
+      type: 'embed',
+      embedUrl: null,
+      externalUrl: null,
+      isIframeCode: true,
+    };
+  }
+
+  // Check YouTube patterns:
+  // - youtube.com/watch?v=ID
+  // - youtu.be/ID
+  // - youtube.com/embed/ID
+  // - youtube-nocookie.com/embed/ID
+  // - youtube.com/shorts/ID
+  const ytMatch = /(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?|shorts)\/|.*[?&]v=)|youtu\.be\/|youtube-nocookie\.com\/embed\/)([^"&?\/\s]{11})/i.exec(trimmed);
+  if (ytMatch && ytMatch[1]) {
+    const id = ytMatch[1];
+    return {
+      type: 'youtube',
+      youtubeId: id,
+      embedUrl: `https://www.youtube.com/embed/${id}?enablejsapi=1&autoplay=1&playsinline=1&rel=0&modestbranding=1&origin=https://academy.tmminnovation.com`,
+      externalUrl: `https://www.youtube.com/watch?v=${id}`,
+    };
+  }
+  if (/^[a-zA-Z0-9_-]{11}$/.test(trimmed)) {
+    return {
+      type: 'youtube',
+      youtubeId: trimmed,
+      embedUrl: `https://www.youtube.com/embed/${trimmed}?enablejsapi=1&autoplay=1&playsinline=1&rel=0&modestbranding=1&origin=https://academy.tmminnovation.com`,
+      externalUrl: `https://www.youtube.com/watch?v=${trimmed}`,
+    };
+  }
+
+  // Check Vimeo patterns:
+  // - vimeo.com/123456789
+  // - vimeo.com/123456789/abcdef123 (unlisted)
+  // - player.vimeo.com/video/123456789?h=abcdef123
+  const vimeoMatch = /(?:vimeo\.com\/|player\.vimeo\.com\/video\/)(\d+)(?:\/([a-zA-Z0-9]+))?(?:\?.*h=([a-zA-Z0-9]+))?/i.exec(trimmed);
+  if (vimeoMatch && vimeoMatch[1]) {
+    const id = vimeoMatch[1];
+    const hash = vimeoMatch[2] || vimeoMatch[3] || null;
+    const hashQuery = hash ? `h=${hash}&` : '';
+    return {
+      type: 'vimeo',
+      vimeoId: id,
+      vimeoHash: hash || undefined,
+      embedUrl: `https://player.vimeo.com/video/${id}?${hashQuery}autoplay=1&title=0&byline=0&portrait=0&transparent=0`,
+      externalUrl: hash ? `https://vimeo.com/${id}/${hash}` : `https://vimeo.com/${id}`,
+    };
+  }
+  if (/^\d+$/.test(trimmed)) {
+    return {
+      type: 'vimeo',
+      vimeoId: trimmed,
+      embedUrl: `https://player.vimeo.com/video/${trimmed}?autoplay=1&title=0&byline=0&portrait=0&transparent=0`,
+      externalUrl: `https://vimeo.com/${trimmed}`,
+    };
+  }
+
+  // Check Direct Video file or relative URL:
+  const isDirectFile = /\.(mp4|m3u8|webm|mov|ogg)(\?.*)?$/i.test(trimmed);
+  const isRelative = trimmed.startsWith('/') || trimmed.startsWith('storage/');
+
+  if (isDirectFile || isRelative) {
+    let fullUrl = trimmed;
+    if (isRelative) {
+      fullUrl = `${API_BASE_URL}${trimmed.startsWith('/') ? '' : '/'}${trimmed}`;
+    }
+    return {
+      type: 'direct',
+      embedUrl: fullUrl,
+      externalUrl: fullUrl,
+    };
+  }
+
+  // Generic embed URL (Bunny, Wistia, Drive, or HTTPS iframe URL)
+  if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
+    return {
+      type: 'embed',
+      embedUrl: trimmed,
+      externalUrl: trimmed,
+    };
+  }
+
+  return { type: 'none', embedUrl: null, externalUrl: null };
+}
+
+function generateVideoHtml(parsed: ParsedVideo, rawCode?: string | null): string | null {
+  if (parsed.type === 'youtube' && parsed.embedUrl) {
+    return `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+          <meta name="referrer" content="always">
+          <style>
+            * { margin: 0; padding: 0; box-sizing: border-box; }
+            body, html { width: 100%; height: 100%; background: #000000; overflow: hidden; display: flex; align-items: center; justify-content: center; }
+            .player-wrap { position: relative; width: 100%; height: 100%; }
+            iframe { position: absolute; top: 0; left: 0; width: 100%; height: 100%; border: 0; }
+          </style>
+        </head>
+        <body>
+          <div class="player-wrap">
+            <iframe
+              src="${parsed.embedUrl}"
+              frameborder="0"
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share; fullscreen"
+              allowfullscreen
+            ></iframe>
+          </div>
+        </body>
+      </html>
+    `;
+  }
+
+  if (parsed.type === 'vimeo' && parsed.embedUrl) {
+    return `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+          <meta name="referrer" content="always">
+          <style>
+            * { margin: 0; padding: 0; box-sizing: border-box; }
+            body, html { width: 100%; height: 100%; background: #0F172A; overflow: hidden; display: flex; align-items: center; justify-content: center; }
+            .player-wrap { position: relative; width: 100%; height: 100%; }
+            iframe { position: absolute; top: 0; left: 0; width: 100%; height: 100%; border: 0; }
+          </style>
+        </head>
+        <body>
+          <div class="player-wrap">
+            <iframe
+              src="${parsed.embedUrl}"
+              frameborder="0"
+              allow="autoplay; fullscreen; picture-in-picture"
+              allowfullscreen
+            ></iframe>
+          </div>
+        </body>
+      </html>
+    `;
+  }
+
+  if (parsed.type === 'direct' && parsed.embedUrl) {
+    return `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+          <style>
+            * { margin: 0; padding: 0; box-sizing: border-box; }
+            body, html { width: 100%; height: 100%; background: #000; overflow: hidden; display: flex; align-items: center; justify-content: center; }
+            video { width: 100%; height: 100%; object-fit: contain; }
+          </style>
+        </head>
+        <body>
+          <video
+            src="${parsed.embedUrl}"
+            controls
+            autoplay
+            playsinline
+            webkit-playsinline
+            preload="auto"
+          ></video>
+        </body>
+      </html>
+    `;
+  }
+
+  if (parsed.type === 'embed') {
+    const content = parsed.isIframeCode && rawCode ? rawCode : `<iframe src="${parsed.embedUrl}" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen" allowfullscreen></iframe>`;
+    return `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+          <meta name="referrer" content="always">
+          <style>
+            * { margin: 0; padding: 0; box-sizing: border-box; }
+            body, html { width: 100%; height: 100%; background: #000; overflow: hidden; display: flex; align-items: center; justify-content: center; }
+            iframe { width: 100%; height: 100%; border: 0; }
+          </style>
+        </head>
+        <body>
+          ${content}
+        </body>
+      </html>
+    `;
+  }
+
+  return null;
 }
 
 export const LessonPlayerScreen: React.FC<{ route: any; navigation: any }> = ({
@@ -51,6 +282,9 @@ export const LessonPlayerScreen: React.FC<{ route: any; navigation: any }> = ({
   const [lesson, setLesson] = useState<LessonDetail | null>(null);
   const [courseDetail, setCourseDetail] = useState<CourseDetail | null>(null);
   const [loadingLesson, setLoadingLesson] = useState(true);
+  const [fetchError, setFetchError] = useState<string | null>(null);
+  const [playbackError, setPlaybackError] = useState<string | null>(null);
+  const [retryKey, setRetryKey] = useState(0);
   const [completing, setCompleting] = useState(false);
   const [isCompleted, setIsCompleted] = useState(false);
   const [downloadingAttachmentId, setDownloadingAttachmentId] = useState<number | string | null>(null);
@@ -77,18 +311,31 @@ export const LessonPlayerScreen: React.FC<{ route: any; navigation: any }> = ({
   // Load specific lesson
   const fetchLesson = useCallback(async (id: number | string) => {
     setLoadingLesson(true);
+    setFetchError(null);
+    setPlaybackError(null);
     try {
       const data = await lmsApi.getLesson(courseSlug, id);
-      setLesson(data);
-      setIsCompleted(Boolean(data?.is_completed || data?.completed));
-      setComments(Array.isArray((data as any)?.comments) ? (data as any).comments : []);
-    } catch {
+      if (!data) {
+        if (!user) {
+          setFetchError('Please sign in to access your course video lessons.');
+        } else {
+          setFetchError('Lesson content could not be loaded from the LMS server.');
+        }
+        setLesson(null);
+        setComments([]);
+      } else {
+        setLesson(data);
+        setIsCompleted(Boolean(data?.is_completed || data?.completed));
+        setComments(Array.isArray((data as any)?.comments) ? (data as any).comments : []);
+      }
+    } catch (err: any) {
       setLesson(null);
       setComments([]);
+      setFetchError(err.message || 'Could not load lesson.');
     } finally {
       setLoadingLesson(false);
     }
-  }, [courseSlug]);
+  }, [courseSlug, user]);
 
   const handlePostComment = async () => {
     const trimmed = newCommentText.trim();
@@ -210,84 +457,19 @@ export const LessonPlayerScreen: React.FC<{ route: any; navigation: any }> = ({
   const nextLesson =
     currentIndex >= 0 && currentIndex < allLessons.length - 1 ? allLessons[currentIndex + 1] : null;
 
-  // Video source detection: YouTube vs Vimeo vs Direct Video
-  const youtubeId = lesson?.youtube_id || extractYouTubeId(lesson?.video_url);
-  const vimeoId = lesson?.vimeo_id || extractVimeoId(lesson?.video_url);
+  // Video source detection: YouTube vs Vimeo vs Direct Video vs Cloud Embed
+  const rawVideoUrl =
+    lesson?.video_url ||
+    (lesson as any)?.video_link ||
+    (lesson as any)?.video ||
+    (lesson as any)?.embed_url ||
+    (lesson as any)?.embed_code ||
+    (lesson as any)?.stream_url ||
+    null;
 
-  let videoEmbedHtml: string | null = null;
-  let videoSourceType: 'youtube' | 'vimeo' | 'direct' | 'none' = 'none';
-
-  if (youtubeId) {
-    videoSourceType = 'youtube';
-    videoEmbedHtml = `
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-          <style>
-            * { margin: 0; padding: 0; box-sizing: border-box; }
-            body, html { width: 100%; height: 100%; background: #000000; overflow: hidden; display: flex; align-items: center; justify-content: center; }
-            .player-wrap { position: relative; width: 100%; height: 100%; }
-            iframe { position: absolute; top: 0; left: 0; width: 100%; height: 100%; border: 0; }
-          </style>
-        </head>
-        <body>
-          <div class="player-wrap">
-            <iframe
-              src="https://www.youtube-nocookie.com/embed/${youtubeId}?autoplay=1&playsinline=1&modestbranding=1&rel=0&fs=1"
-              frameborder="0"
-              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share; fullscreen"
-              allowfullscreen
-            ></iframe>
-          </div>
-        </body>
-      </html>
-    `;
-  } else if (vimeoId) {
-    videoSourceType = 'vimeo';
-    videoEmbedHtml = `
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-          <style>
-            * { margin: 0; padding: 0; box-sizing: border-box; }
-            body, html { width: 100%; height: 100%; background: #0F172A; overflow: hidden; display: flex; align-items: center; justify-content: center; }
-            .player-wrap { position: relative; width: 100%; height: 100%; }
-            iframe { position: absolute; top: 0; left: 0; width: 100%; height: 100%; border: 0; }
-          </style>
-        </head>
-        <body>
-          <div class="player-wrap">
-            <iframe
-              src="https://player.vimeo.com/video/${vimeoId}?autoplay=1&title=0&byline=0&portrait=0&transparent=0"
-              frameborder="0"
-              allow="autoplay; fullscreen; picture-in-picture"
-              allowfullscreen
-            ></iframe>
-          </div>
-        </body>
-      </html>
-    `;
-  } else if (lesson?.video_url && lesson.video_url.startsWith('http')) {
-    videoSourceType = 'direct';
-    videoEmbedHtml = `
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-          <style>
-            * { margin: 0; padding: 0; box-sizing: border-box; }
-            body, html { width: 100%; height: 100%; background: #000; overflow: hidden; display: flex; align-items: center; justify-content: center; }
-            video { width: 100%; height: 100%; object-fit: contain; }
-          </style>
-        </head>
-        <body>
-          <video src="${lesson.video_url}" controls autoplay playsinline></video>
-        </body>
-      </html>
-    `;
-  }
+  const parsedVideo = parseVideo(rawVideoUrl, lesson?.youtube_id, lesson?.vimeo_id);
+  const videoEmbedHtml = generateVideoHtml(parsedVideo, rawVideoUrl);
+  const videoSourceType = parsedVideo.type;
 
   // Collect resources & PDF attachments
   const attachmentsList: LessonAttachment[] = [];
@@ -343,21 +525,106 @@ export const LessonPlayerScreen: React.FC<{ route: any; navigation: any }> = ({
             <ActivityIndicator size="large" color={Colors.signal} />
             <Text style={styles.loadingText}>Loading lesson video...</Text>
           </View>
+        ) : playbackError ? (
+          <View style={styles.errorOverlay}>
+            <Ionicons name="alert-circle-outline" size={38} color="#F87171" />
+            <Text style={styles.errorOverlayTitle}>Video Playback Notice</Text>
+            <Text style={styles.errorOverlaySub}>
+              {playbackError}. Tap Retry or watch directly via the external app link.
+            </Text>
+            <View style={styles.errorActionsRow}>
+              <TouchableOpacity
+                style={styles.retryBtn}
+                onPress={() => {
+                  setPlaybackError(null);
+                  setRetryKey((k) => k + 1);
+                }}
+                activeOpacity={0.8}
+              >
+                <Ionicons name="reload" size={14} color="#FFFFFF" />
+                <Text style={styles.retryBtnText}>Retry Player</Text>
+              </TouchableOpacity>
+              {parsedVideo.externalUrl ? (
+                <TouchableOpacity
+                  style={styles.openExternalBtn}
+                  onPress={() => void Linking.openURL(parsedVideo.externalUrl!)}
+                  activeOpacity={0.8}
+                >
+                  <Ionicons name="open-outline" size={14} color={Colors.signal} />
+                  <Text style={styles.openExternalBtnText}>
+                    {parsedVideo.type === 'youtube'
+                      ? 'Open in YouTube'
+                      : parsedVideo.type === 'vimeo'
+                      ? 'Open in Vimeo'
+                      : 'Open Video'}
+                  </Text>
+                </TouchableOpacity>
+              ) : null}
+            </View>
+          </View>
         ) : videoEmbedHtml ? (
           <WebView
+            key={`video_${currentLessonId}_${retryKey}`}
             originWhitelist={['*']}
-            source={{ html: videoEmbedHtml }}
+            source={{
+              html: videoEmbedHtml,
+              baseUrl: 'https://academy.tmminnovation.com',
+            }}
             style={styles.webview}
             allowsFullscreenVideo
             javaScriptEnabled
             domStorageEnabled
             mediaPlaybackRequiresUserAction={false}
             allowsInlineMediaPlayback
+            mixedContentMode="always"
+            androidHardwareAccelerationDisabled={false}
+            androidLayerType="hardware"
+            setSupportMultipleWindows={false}
+            javaScriptCanOpenWindowsAutomatically={false}
+            userAgent="Mozilla/5.0 (Linux; Android 14; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Mobile Safari/537.36"
+            onError={(syntheticEvent) => {
+              const { nativeEvent } = syntheticEvent;
+              console.warn('[WebView Error]', nativeEvent);
+              setPlaybackError(nativeEvent.description || 'Playback failed to load');
+            }}
+            onHttpError={(syntheticEvent) => {
+              const { nativeEvent } = syntheticEvent;
+              if (nativeEvent.statusCode >= 400) {
+                console.warn('[WebView HttpError]', nativeEvent.statusCode);
+                setPlaybackError(`HTTP Error (${nativeEvent.statusCode})`);
+              }
+            }}
           />
         ) : (
           <View style={styles.videoPlaceholder}>
-            <Ionicons name="videocam-outline" size={48} color={Colors.textMuted} />
-            <Text style={styles.noVideoText}>Video player unavailable for this lesson</Text>
+            <Ionicons name="videocam-off-outline" size={44} color={Colors.textMuted} />
+            <Text style={styles.noVideoTitle}>
+              {fetchError || 'No Video Attached to this Lesson'}
+            </Text>
+            <Text style={styles.noVideoSubtitle}>
+              {fetchError
+                ? 'Please check your connection or sign in with your active student account.'
+                : 'The instructor has not uploaded a video for this module yet.'}
+            </Text>
+            <View style={styles.noVideoActionsRow}>
+              <TouchableOpacity
+                style={styles.retryBtn}
+                onPress={() => void fetchLesson(currentLessonId)}
+                activeOpacity={0.8}
+              >
+                <Ionicons name="reload" size={14} color="#FFFFFF" />
+                <Text style={styles.retryBtnText}>Reload Lesson</Text>
+              </TouchableOpacity>
+              {!user && (
+                <TouchableOpacity
+                  style={styles.signInBtn}
+                  onPress={() => navigation.navigate('Login')}
+                  activeOpacity={0.8}
+                >
+                  <Text style={styles.signInBtnText}>Sign In</Text>
+                </TouchableOpacity>
+              )}
+            </View>
           </View>
         )}
       </View>
@@ -397,6 +664,29 @@ export const LessonPlayerScreen: React.FC<{ route: any; navigation: any }> = ({
                 <Text style={[styles.providerBadgeText, { color: Colors.signal }]}>Video Stream</Text>
               </View>
             )}
+            {videoSourceType === 'embed' && (
+              <View style={[styles.providerBadge, { backgroundColor: '#F5F3FF', borderColor: '#DDD6FE' }]}>
+                <Ionicons name="tv-outline" size={13} color="#7C3AED" />
+                <Text style={[styles.providerBadgeText, { color: '#7C3AED' }]}>Cloud Stream</Text>
+              </View>
+            )}
+
+            {parsedVideo.externalUrl ? (
+              <TouchableOpacity
+                style={styles.openExternalPill}
+                onPress={() => void Linking.openURL(parsedVideo.externalUrl!)}
+                activeOpacity={0.7}
+              >
+                <Ionicons name="open-outline" size={12} color={Colors.signal} />
+                <Text style={styles.openExternalPillText}>
+                  {parsedVideo.type === 'youtube'
+                    ? 'Watch on YouTube'
+                    : parsedVideo.type === 'vimeo'
+                    ? 'Watch on Vimeo'
+                    : 'Open External'}
+                </Text>
+              </TouchableOpacity>
+            ) : null}
 
             {lesson?.duration_minutes ? (
               <View style={styles.metaPill}>
@@ -823,6 +1113,114 @@ const styles = StyleSheet.create({
     color: Colors.textMuted,
     marginTop: 10,
     fontSize: 13,
+  },
+  openExternalPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#ECFEFF',
+    paddingHorizontal: 9,
+    paddingVertical: 4,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#A5F3FC',
+  },
+  openExternalPillText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: Colors.signal,
+  },
+  errorOverlay: {
+    flex: 1,
+    backgroundColor: '#1E293B',
+    padding: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  errorOverlayTitle: {
+    color: '#FFFFFF',
+    fontSize: 15,
+    fontWeight: '800',
+    marginTop: 8,
+    marginBottom: 4,
+  },
+  errorOverlaySub: {
+    color: '#94A3B8',
+    fontSize: 12,
+    textAlign: 'center',
+    lineHeight: 18,
+    marginBottom: 14,
+    paddingHorizontal: 12,
+  },
+  errorActionsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+  },
+  retryBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: Colors.signal,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 8,
+  },
+  retryBtnText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  openExternalBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: '#0F172A',
+    borderWidth: 1,
+    borderColor: Colors.signal,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 8,
+  },
+  openExternalBtnText: {
+    color: Colors.signal,
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  noVideoTitle: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '700',
+    marginTop: 10,
+    textAlign: 'center',
+    paddingHorizontal: 16,
+  },
+  noVideoSubtitle: {
+    color: '#94A3B8',
+    fontSize: 12,
+    marginTop: 4,
+    textAlign: 'center',
+    paddingHorizontal: 24,
+    lineHeight: 17,
+  },
+  noVideoActionsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginTop: 14,
+  },
+  signInBtn: {
+    backgroundColor: '#334155',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 8,
+  },
+  signInBtnText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '700',
   },
   scrollContainer: {
     flex: 1,
