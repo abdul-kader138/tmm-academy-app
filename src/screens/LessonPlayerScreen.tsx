@@ -19,6 +19,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import * as ScreenOrientation from 'expo-screen-orientation';
+import * as NavigationBar from 'expo-navigation-bar';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -465,8 +466,10 @@ export const LessonPlayerScreen: React.FC<{ route: any; navigation: any }> = ({
 
   const panResponder = useRef(
     PanResponder.create({
-      onStartShouldSetPanResponder: () => isFullscreen,
-      onMoveShouldSetPanResponder: (_, gestureState) => isFullscreen && Math.abs(gestureState.dy) > 5,
+      onStartShouldSetPanResponder: () => false,
+      onStartShouldSetPanResponderCapture: () => false,
+      onMoveShouldSetPanResponder: (_, gestureState) => isFullscreen && Math.abs(gestureState.dy) > 10,
+      onMoveShouldSetPanResponderCapture: (_, gestureState) => isFullscreen && Math.abs(gestureState.dy) > 10,
       onPanResponderGrant: (evt) => {
         const { locationX } = evt.nativeEvent;
         const width = containerDimensionsRef.current.width || Dimensions.get('window').width;
@@ -501,11 +504,59 @@ export const LessonPlayerScreen: React.FC<{ route: any; navigation: any }> = ({
     })
   ).current;
 
-  // Toggle fullscreen mode with screen orientation lock/unlock
+  // Fullscreen header auto-hide (shows for 3.5s on entry or single tap, then hides)
+  const [showFullscreenHeader, setShowFullscreenHeader] = useState(false);
+  const headerTimerRef = useRef<any>(null);
+
+  const triggerHeaderAutoHide = useCallback(() => {
+    if (headerTimerRef.current) clearTimeout(headerTimerRef.current);
+    headerTimerRef.current = setTimeout(() => {
+      setShowFullscreenHeader(false);
+    }, 3500);
+  }, []);
+
+  const handleToggleFullscreenHeader = useCallback(() => {
+    setShowFullscreenHeader((prev) => {
+      const next = !prev;
+      if (next) {
+        triggerHeaderAutoHide();
+      } else if (headerTimerRef.current) {
+        clearTimeout(headerTimerRef.current);
+      }
+      return next;
+    });
+  }, [triggerHeaderAutoHide]);
+
+  useEffect(() => {
+    if (isFullscreen) {
+      setShowFullscreenHeader(true);
+      triggerHeaderAutoHide();
+    } else {
+      setShowFullscreenHeader(false);
+      if (headerTimerRef.current) clearTimeout(headerTimerRef.current);
+    }
+  }, [isFullscreen, triggerHeaderAutoHide]);
+
+  // Android System Navigation Bar (immersive auto-hide in fullscreen, restore on exit/unmount)
+  useEffect(() => {
+    if (Platform.OS === 'android') {
+      NavigationBar.setVisibilityAsync(isFullscreen ? 'hidden' : 'visible').catch(() => {});
+    }
+    return () => {
+      if (Platform.OS === 'android') {
+        NavigationBar.setVisibilityAsync('visible').catch(() => {});
+      }
+    };
+  }, [isFullscreen]);
+
+  // Toggle fullscreen mode with screen orientation lock/unlock & Android nav bar sync
   const toggleFullscreen = useCallback(
     async (targetState?: boolean) => {
       const next = typeof targetState === 'boolean' ? targetState : !isFullscreen;
       setIsFullscreen(next);
+      if (Platform.OS === 'android') {
+        NavigationBar.setVisibilityAsync(next ? 'hidden' : 'visible').catch(() => {});
+      }
       try {
         if (next) {
           await ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.LANDSCAPE);
@@ -544,6 +595,9 @@ export const LessonPlayerScreen: React.FC<{ route: any; navigation: any }> = ({
     return () => {
       ScreenOrientation.removeOrientationChangeListener(orientationSub);
       ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP).catch(() => {});
+      if (Platform.OS === 'android') {
+        NavigationBar.setVisibilityAsync('visible').catch(() => {});
+      }
     };
   }, []);
 
@@ -768,6 +822,9 @@ export const LessonPlayerScreen: React.FC<{ route: any; navigation: any }> = ({
   return (
     <View style={styles.container}>
       <StatusBar style="light" animated hidden={isFullscreen} />
+      {Platform.OS === 'android' && (
+        <NavigationBar.NavigationBar hidden={isFullscreen} style={isFullscreen ? 'light' : 'dark'} />
+      )}
 
       {/* Top Navbar */}
       <View
@@ -805,10 +862,15 @@ export const LessonPlayerScreen: React.FC<{ route: any; navigation: any }> = ({
         onLayout={(e) => {
           containerDimensionsRef.current = e.nativeEvent.layout;
         }}
+        onTouchEnd={() => {
+          if (isFullscreen && !hudState.type) {
+            handleToggleFullscreenHeader();
+          }
+        }}
         {...panResponder.panHandlers}
       >
-        {/* Fullscreen Top Header */}
-        {isFullscreen && (
+        {/* Fullscreen Top Header (Auto-hides after 3.5s or single tap) */}
+        {isFullscreen && showFullscreenHeader && (
           <View style={styles.fullscreenHeaderRow}>
             <TouchableOpacity
               style={styles.fullscreenBackBtn}
@@ -827,15 +889,6 @@ export const LessonPlayerScreen: React.FC<{ route: any; navigation: any }> = ({
             >
               <Ionicons name="contract" size={20} color="#FFFFFF" />
             </TouchableOpacity>
-          </View>
-        )}
-
-        {/* Fullscreen Gesture Guidance Hint */}
-        {isFullscreen && (
-          <View pointerEvents="none" style={styles.gestureHintPill}>
-            <Text style={styles.gestureHintText}>
-              👈 Slide left for Brightness • Slide right for Volume 👉
-            </Text>
           </View>
         )}
 
@@ -1001,33 +1054,6 @@ export const LessonPlayerScreen: React.FC<{ route: any; navigation: any }> = ({
               </View>
               <Text style={styles.hudPercentText}>{Math.round(hudState.value * 100)}%</Text>
             </View>
-          </View>
-        )}
-
-        {/* Fullscreen Floating Bottom Controls */}
-        {isFullscreen && videoEmbedHtml && (
-          <View style={styles.fullscreenControlsRow}>
-            <TouchableOpacity style={styles.fsActionBtn} onPress={() => handleSeek(-10)} activeOpacity={0.7}>
-              <Ionicons name="play-back" size={18} color="#FFFFFF" />
-              <Text style={styles.fsActionBtnText}>-10s</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity style={styles.fsPlayBtn} onPress={handleTogglePlay} activeOpacity={0.8}>
-              <Ionicons name={isPlaying ? 'pause' : 'play'} size={22} color="#FFFFFF" />
-            </TouchableOpacity>
-
-            <TouchableOpacity style={styles.fsActionBtn} onPress={() => handleSeek(10)} activeOpacity={0.7}>
-              <Ionicons name="play-forward" size={18} color="#FFFFFF" />
-              <Text style={styles.fsActionBtnText}>+10s</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity style={styles.fsSpeedBtn} onPress={handleCycleSpeed} activeOpacity={0.7}>
-              <Text style={styles.fsSpeedBtnText}>{currentSpeed}x</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity style={styles.fsActionBtn} onPress={() => void toggleFullscreen(false)} activeOpacity={0.7}>
-              <Ionicons name="contract" size={20} color="#FFFFFF" />
-            </TouchableOpacity>
           </View>
         )}
       </View>
