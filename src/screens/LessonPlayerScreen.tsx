@@ -20,6 +20,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import * as ScreenOrientation from 'expo-screen-orientation';
 import * as NavigationBar from 'expo-navigation-bar';
+import * as Brightness from 'expo-brightness';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -28,6 +29,14 @@ import { lmsApi, API_BASE_URL } from '../api/lmsApi';
 import { LessonDetail, CourseDetail, LessonAttachment } from '../api/types';
 import { useAuth } from '../context/AuthContext';
 import { cleanHtml } from '../utils/text';
+
+// Safe volume manager resolver for standalone Android APK & graceful fallback in Expo Go
+let VolumeManager: any = null;
+try {
+  VolumeManager = require('react-native-volume-manager')?.VolumeManager;
+} catch {
+  VolumeManager = null;
+}
 
 interface ParsedVideo {
   type: 'youtube' | 'vimeo' | 'direct' | 'embed' | 'none';
@@ -234,6 +243,8 @@ function generateVideoHtml(parsed: ParsedVideo, rawCode?: string | null): string
                   if (ytPlayer.setPlaybackRate) ytPlayer.setPlaybackRate(cmd.speed);
                 } else if (cmd.action === 'setVolume') {
                   if (ytPlayer.setVolume) ytPlayer.setVolume(Math.round(cmd.volume * 100));
+                  if (cmd.volume === 0) { if (ytPlayer.mute) ytPlayer.mute(); }
+                  else { if (ytPlayer.unMute) ytPlayer.unMute(); }
                 } else if (cmd.action === 'play') {
                   if (ytPlayer.playVideo) ytPlayer.playVideo();
                 } else if (cmd.action === 'pause') {
@@ -313,7 +324,13 @@ function generateVideoHtml(parsed: ParsedVideo, rawCode?: string | null): string
                 } else if (cmd.action === 'setSpeed') {
                   vimeoPlayer.setPlaybackRate(cmd.speed);
                 } else if (cmd.action === 'setVolume') {
-                  vimeoPlayer.setVolume(Math.max(0, Math.min(1, cmd.volume)));
+                  var vol = Math.max(0, Math.min(1, cmd.volume));
+                  vimeoPlayer.setVolume(vol).catch(function(){});
+                  if (vol === 0) {
+                    vimeoPlayer.setMuted(true).catch(function(){});
+                  } else {
+                    vimeoPlayer.setMuted(false).catch(function(){});
+                  }
                 } else if (cmd.action === 'play') {
                   vimeoPlayer.play();
                 } else if (cmd.action === 'pause') {
@@ -382,7 +399,9 @@ function generateVideoHtml(parsed: ParsedVideo, rawCode?: string | null): string
                 } else if (cmd.action === 'setSpeed') {
                   videoEl.playbackRate = cmd.speed;
                 } else if (cmd.action === 'setVolume') {
-                  videoEl.volume = Math.max(0, Math.min(1, cmd.volume));
+                  var vol = Math.max(0, Math.min(1, cmd.volume));
+                  videoEl.volume = vol;
+                  videoEl.muted = (vol === 0);
                 } else if (cmd.action === 'play') {
                   videoEl.play();
                 } else if (cmd.action === 'pause') {
@@ -469,17 +488,17 @@ export const LessonPlayerScreen: React.FC<{ route: any; navigation: any }> = ({
   const [isPlaying, setIsPlaying] = useState(true);
   const [isFullscreen, setIsFullscreen] = useState(false);
 
-  // Gesture Brightness (0.2 to 1.0) & Volume (0.0 to 1.0)
-  const [brightness, setBrightness] = useState(1.0);
-  const [volume, setVolume] = useState(1.0);
+  // Gesture Brightness (0.05 to 1.0) & Volume (0.0 to 1.0)
+  const [brightness, setBrightness] = useState(0.7);
+  const [volume, setVolume] = useState(0.7);
   const [hudState, setHudState] = useState<{ type: 'brightness' | 'volume' | null; value: number }>({
     type: null,
-    value: 1.0,
+    value: 0.7,
   });
   const hudTimerRef = useRef<any>(null);
 
-  const dragStartBrightnessRef = useRef(1.0);
-  const dragStartVolumeRef = useRef(1.0);
+  const dragStartBrightnessRef = useRef(0.7);
+  const dragStartVolumeRef = useRef(0.7);
   const dragSideRef = useRef<'left' | 'right'>('left');
   const containerDimensionsRef = useRef({
     width: Dimensions.get('window').width,
@@ -515,8 +534,8 @@ export const LessonPlayerScreen: React.FC<{ route: any; navigation: any }> = ({
     PanResponder.create({
       onStartShouldSetPanResponder: () => false,
       onStartShouldSetPanResponderCapture: () => false,
-      onMoveShouldSetPanResponder: (_, gestureState) => isFullscreen && Math.abs(gestureState.dy) > 10,
-      onMoveShouldSetPanResponderCapture: (_, gestureState) => isFullscreen && Math.abs(gestureState.dy) > 10,
+      onMoveShouldSetPanResponder: (_, gestureState) => isFullscreen && Math.abs(gestureState.dy) > 8,
+      onMoveShouldSetPanResponderCapture: (_, gestureState) => isFullscreen && Math.abs(gestureState.dy) > 8,
       onPanResponderGrant: (evt) => {
         const { locationX } = evt.nativeEvent;
         const width = containerDimensionsRef.current.width || Dimensions.get('window').width;
@@ -532,13 +551,17 @@ export const LessonPlayerScreen: React.FC<{ route: any; navigation: any }> = ({
       onPanResponderMove: (_, gestureState) => {
         const delta = -gestureState.dy / 180;
         if (dragSideRef.current === 'left') {
-          const next = Math.min(1.0, Math.max(0.2, dragStartBrightnessRef.current + delta));
+          const next = Math.min(1.0, Math.max(0.05, dragStartBrightnessRef.current + delta));
           setBrightness(next);
           setHudState({ type: 'brightness', value: next });
+          Brightness.setBrightnessAsync(next).catch(() => {});
         } else {
           const next = Math.min(1.0, Math.max(0.0, dragStartVolumeRef.current + delta));
           setVolume(next);
           setHudState({ type: 'volume', value: next });
+          if (VolumeManager?.setVolume) {
+            VolumeManager.setVolume(next, { showUI: false }).catch(() => {});
+          }
           sendPlayerCommand({ action: 'setVolume', volume: next });
         }
       },
@@ -550,6 +573,42 @@ export const LessonPlayerScreen: React.FC<{ route: any; navigation: any }> = ({
       },
     })
   ).current;
+
+  // Screen Brightness & Volume Hardware Sync
+  useEffect(() => {
+    if (isFullscreen) {
+      Brightness.getBrightnessAsync()
+        .then((val) => {
+          if (typeof val === 'number' && !isNaN(val)) {
+            const safeB = Math.min(1.0, Math.max(0.05, val));
+            setBrightness(safeB);
+            dragStartBrightnessRef.current = safeB;
+          }
+        })
+        .catch(() => {});
+
+      if (VolumeManager?.getVolume) {
+        VolumeManager.getVolume()
+          .then((res: any) => {
+            const v = typeof res === 'number' ? res : res?.volume;
+            if (typeof v === 'number' && !isNaN(v)) {
+              const safeV = Math.min(1.0, Math.max(0.0, v));
+              setVolume(safeV);
+              dragStartVolumeRef.current = safeV;
+            }
+          })
+          .catch(() => {});
+      }
+    } else {
+      Brightness.restoreSystemBrightnessAsync().catch(() => {});
+    }
+  }, [isFullscreen]);
+
+  useEffect(() => {
+    return () => {
+      Brightness.restoreSystemBrightnessAsync().catch(() => {});
+    };
+  }, []);
 
   // Fullscreen header auto-hide (shows for 3.5s on entry or single tap, then hides)
   const [showFullscreenHeader, setShowFullscreenHeader] = useState(false);
@@ -1069,7 +1128,7 @@ export const LessonPlayerScreen: React.FC<{ route: any; navigation: any }> = ({
             StyleSheet.absoluteFill,
             {
               backgroundColor: '#000000',
-              opacity: Math.max(0, 1 - brightness),
+              opacity: Math.max(0, Math.min(0.85, (1 - brightness) * 0.7)),
               zIndex: 10,
             },
           ]}
@@ -1082,17 +1141,33 @@ export const LessonPlayerScreen: React.FC<{ route: any; navigation: any }> = ({
               <Ionicons
                 name={
                   hudState.type === 'brightness'
-                    ? hudState.value > 0.5 ? 'sunny' : 'sunny-outline'
-                    : hudState.value === 0 ? 'volume-mute' : hudState.value < 0.5 ? 'volume-low' : 'volume-high'
+                    ? hudState.value > 0.5
+                      ? 'sunny'
+                      : 'sunny-outline'
+                    : hudState.value === 0
+                    ? 'volume-mute'
+                    : hudState.value < 0.35
+                    ? 'volume-low'
+                    : hudState.value < 0.7
+                    ? 'volume-medium'
+                    : 'volume-high'
                 }
-                size={30}
-                color="#FFFFFF"
+                size={34}
+                color={hudState.type === 'brightness' ? '#F59E0B' : '#38BDF8'}
               />
               <Text style={styles.hudText}>
                 {hudState.type === 'brightness' ? 'Brightness' : 'Volume'}
               </Text>
               <View style={styles.hudProgressBarTrack}>
-                <View style={[styles.hudProgressBarFill, { width: `${Math.round(hudState.value * 100)}%` }]} />
+                <View
+                  style={[
+                    styles.hudProgressBarFill,
+                    {
+                      width: `${Math.round(hudState.value * 100)}%`,
+                      backgroundColor: hudState.type === 'brightness' ? '#F59E0B' : '#38BDF8',
+                    },
+                  ]}
+                />
               </View>
               <Text style={styles.hudPercentText}>{Math.round(hudState.value * 100)}%</Text>
             </View>
@@ -2350,42 +2425,42 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFill,
     justifyContent: 'center',
     alignItems: 'center',
-    zIndex: 25,
+    zIndex: 60,
   },
   hudCard: {
-    backgroundColor: 'rgba(15, 23, 42, 0.9)',
-    borderRadius: 16,
-    paddingVertical: 16,
-    paddingHorizontal: 24,
+    backgroundColor: 'rgba(15, 23, 42, 0.92)',
+    borderRadius: 18,
+    paddingVertical: 18,
+    paddingHorizontal: 26,
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.15)',
-    minWidth: 140,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
+    minWidth: 150,
   },
   hudText: {
     color: '#FFFFFF',
-    fontSize: 13,
+    fontSize: 14,
     fontWeight: '700',
     marginTop: 6,
+    letterSpacing: 0.5,
   },
   hudProgressBarTrack: {
-    width: 100,
-    height: 5,
+    width: 110,
+    height: 6,
     backgroundColor: 'rgba(255,255,255,0.2)',
     borderRadius: 3,
-    marginTop: 8,
+    marginTop: 10,
     overflow: 'hidden',
   },
   hudProgressBarFill: {
     height: '100%',
-    backgroundColor: Colors.signal,
     borderRadius: 3,
   },
   hudPercentText: {
-    color: '#94A3B8',
-    fontSize: 11,
-    fontWeight: '700',
-    marginTop: 4,
+    color: '#E2E8F0',
+    fontSize: 13,
+    fontWeight: '800',
+    marginTop: 6,
   },
   gestureHintPill: {
     position: 'absolute',
