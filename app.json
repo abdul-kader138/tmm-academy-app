@@ -4,7 +4,7 @@
     "slug": "tmm-academy-app",
     "owner": "tasnikursifat",
     "version": "1.0.5",
-    "orientation": "portrait",
+    "orientation": "default",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "androidStatusBar": {

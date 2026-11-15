@@ -1,8 +1,9 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Platform, View } from 'react-native';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { NavigationBar } from 'expo-navigation-bar';
+import * as ScreenOrientation from 'expo-screen-orientation';
 import { AuthProvider } from './src/context/AuthContext';
 import { RootNavigator } from './src/navigation/RootNavigator';
 import { AppErrorBoundary } from './src/components/AppErrorBoundary';
@@ -10,6 +11,10 @@ import { Colors } from './src/theme/colors';
 
 function MainApp() {
   const insets = useSafeAreaInsets();
+
+  useEffect(() => {
+    ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP).catch(() => {});
+  }, []);
 
   return (
     <View style={{ flex: 1, backgroundColor: Colors.canvas }}>

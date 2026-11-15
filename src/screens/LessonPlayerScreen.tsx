@@ -12,11 +12,13 @@ import {
   Linking,
   PanResponder,
   Dimensions,
+  BackHandler,
 } from 'react-native';
 import { WebView } from 'react-native-webview';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
+import * as ScreenOrientation from 'expo-screen-orientation';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -499,6 +501,63 @@ export const LessonPlayerScreen: React.FC<{ route: any; navigation: any }> = ({
     })
   ).current;
 
+  // Toggle fullscreen mode with screen orientation lock/unlock
+  const toggleFullscreen = useCallback(
+    async (targetState?: boolean) => {
+      const next = typeof targetState === 'boolean' ? targetState : !isFullscreen;
+      setIsFullscreen(next);
+      try {
+        if (next) {
+          await ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.LANDSCAPE);
+        } else {
+          await ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP);
+          setTimeout(() => {
+            ScreenOrientation.unlockAsync().catch(() => {});
+          }, 600);
+        }
+      } catch (e) {
+        console.warn('[ScreenOrientation toggle error]', e);
+      }
+    },
+    [isFullscreen]
+  );
+
+  // Auto-rotate on phone tilt when device auto-rotate is ON
+  useEffect(() => {
+    ScreenOrientation.unlockAsync().catch(() => {});
+
+    const orientationSub = ScreenOrientation.addOrientationChangeListener((evt) => {
+      const o = evt.orientationInfo.orientation;
+      if (
+        o === ScreenOrientation.Orientation.LANDSCAPE_LEFT ||
+        o === ScreenOrientation.Orientation.LANDSCAPE_RIGHT
+      ) {
+        setIsFullscreen(true);
+      } else if (
+        o === ScreenOrientation.Orientation.PORTRAIT_UP ||
+        o === ScreenOrientation.Orientation.PORTRAIT_DOWN
+      ) {
+        setIsFullscreen(false);
+      }
+    });
+
+    return () => {
+      ScreenOrientation.removeOrientationChangeListener(orientationSub);
+      ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP).catch(() => {});
+    };
+  }, []);
+
+  // Hardware back button on Android: exit fullscreen first if active
+  useEffect(() => {
+    if (!isFullscreen) return;
+    const backAction = () => {
+      void toggleFullscreen(false);
+      return true;
+    };
+    const backHandler = BackHandler.addEventListener('hardwareBackPress', backAction);
+    return () => backHandler.remove();
+  }, [isFullscreen, toggleFullscreen]);
+
   // Load course details
   useEffect(() => {
     let isMounted = true;
@@ -708,7 +767,7 @@ export const LessonPlayerScreen: React.FC<{ route: any; navigation: any }> = ({
 
   return (
     <View style={styles.container}>
-      <StatusBar style="light" animated />
+      <StatusBar style="light" animated hidden={isFullscreen} />
 
       {/* Top Navbar */}
       <View
@@ -753,7 +812,7 @@ export const LessonPlayerScreen: React.FC<{ route: any; navigation: any }> = ({
           <View style={styles.fullscreenHeaderRow}>
             <TouchableOpacity
               style={styles.fullscreenBackBtn}
-              onPress={() => setIsFullscreen(false)}
+              onPress={() => void toggleFullscreen(false)}
               activeOpacity={0.7}
             >
               <Ionicons name="arrow-back" size={22} color="#FFFFFF" />
@@ -763,7 +822,7 @@ export const LessonPlayerScreen: React.FC<{ route: any; navigation: any }> = ({
             </Text>
             <TouchableOpacity
               style={styles.fullscreenBackBtn}
-              onPress={() => setIsFullscreen(false)}
+              onPress={() => void toggleFullscreen(false)}
               activeOpacity={0.7}
             >
               <Ionicons name="contract" size={20} color="#FFFFFF" />
@@ -966,7 +1025,7 @@ export const LessonPlayerScreen: React.FC<{ route: any; navigation: any }> = ({
               <Text style={styles.fsSpeedBtnText}>{currentSpeed}x</Text>
             </TouchableOpacity>
 
-            <TouchableOpacity style={styles.fsActionBtn} onPress={() => setIsFullscreen(false)} activeOpacity={0.7}>
+            <TouchableOpacity style={styles.fsActionBtn} onPress={() => void toggleFullscreen(false)} activeOpacity={0.7}>
               <Ionicons name="contract" size={20} color="#FFFFFF" />
             </TouchableOpacity>
           </View>
@@ -1013,7 +1072,7 @@ export const LessonPlayerScreen: React.FC<{ route: any; navigation: any }> = ({
 
           <TouchableOpacity
             style={[styles.quickCtrlBtn, styles.quickFsBtn]}
-            onPress={() => setIsFullscreen(true)}
+            onPress={() => void toggleFullscreen(true)}
             activeOpacity={0.7}
           >
             <Ionicons name="expand" size={16} color="#38BDF8" />
