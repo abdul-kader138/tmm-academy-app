@@ -186,14 +186,31 @@ function generateVideoHtml(parsed: ParsedVideo, rawCode?: string | null): string
           <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
           <meta name="referrer" content="always">
           <style>
-            * { margin: 0; padding: 0; box-sizing: border-box; }
+            * {
+              margin: 0;
+              padding: 0;
+              box-sizing: border-box;
+              -webkit-touch-callout: none !important;
+              -webkit-user-select: none !important;
+              user-select: none !important;
+              -webkit-tap-highlight-color: transparent !important;
+            }
             body, html { width: 100vw; height: 100vh; min-height: 100vh; background: #000000; overflow: hidden; display: flex; align-items: center; justify-content: center; }
             .player-wrap { position: relative; width: 100vw; height: 100vh; }
             iframe { position: absolute; top: 0; left: 0; width: 100vw; height: 100vh; border: 0; }
+            .touch-blocker {
+              position: absolute;
+              top: 0;
+              left: 0;
+              right: 0;
+              bottom: 48px;
+              z-index: 10;
+              background: transparent;
+            }
           </style>
           <script src="https://www.youtube.com/iframe_api"></script>
         </head>
-        <body>
+        <body oncontextmenu="return false;">
           <div class="player-wrap">
             <iframe
               id="player_yt"
@@ -202,8 +219,12 @@ function generateVideoHtml(parsed: ParsedVideo, rawCode?: string | null): string
               allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share; fullscreen"
               allowfullscreen
             ></iframe>
+            <div id="touch_blocker_yt" class="touch-blocker"></div>
           </div>
           <script>
+            window.addEventListener('contextmenu', function(e) { e.preventDefault(); e.stopPropagation(); return false; }, true);
+            document.addEventListener('contextmenu', function(e) { e.preventDefault(); e.stopPropagation(); return false; }, true);
+
             var ytPlayer;
             function onYouTubeIframeAPIReady() {
               ytPlayer = new YT.Player('player_yt', {
@@ -212,6 +233,22 @@ function generateVideoHtml(parsed: ParsedVideo, rawCode?: string | null): string
                 }
               });
             }
+
+            var blockerYt = document.getElementById('touch_blocker_yt');
+            if (blockerYt) {
+              blockerYt.addEventListener('contextmenu', function(e) { e.preventDefault(); e.stopPropagation(); return false; });
+              var startYt = 0, movedYt = false;
+              blockerYt.addEventListener('touchstart', function() { startYt = Date.now(); movedYt = false; }, { passive: true });
+              blockerYt.addEventListener('touchmove', function() { movedYt = true; }, { passive: true });
+              blockerYt.addEventListener('touchend', function() {
+                if (!movedYt && (Date.now() - startYt < 350) && ytPlayer) {
+                  var state = (ytPlayer.getPlayerState && typeof ytPlayer.getPlayerState === 'function') ? ytPlayer.getPlayerState() : 1;
+                  if (state === 1) ytPlayer.pauseVideo();
+                  else ytPlayer.playVideo();
+                }
+              });
+            }
+
             window.handlePlayerCommand = function(cmd) {
               if (!ytPlayer) return;
               try {
@@ -257,14 +294,31 @@ function generateVideoHtml(parsed: ParsedVideo, rawCode?: string | null): string
           <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
           <meta name="referrer" content="always">
           <style>
-            * { margin: 0; padding: 0; box-sizing: border-box; }
+            * {
+              margin: 0;
+              padding: 0;
+              box-sizing: border-box;
+              -webkit-touch-callout: none !important;
+              -webkit-user-select: none !important;
+              user-select: none !important;
+              -webkit-tap-highlight-color: transparent !important;
+            }
             body, html { width: 100vw; height: 100vh; min-height: 100vh; background: #0F172A; overflow: hidden; display: flex; align-items: center; justify-content: center; }
             .player-wrap { position: relative; width: 100vw; height: 100vh; }
             iframe { position: absolute; top: 0; left: 0; width: 100vw; height: 100vh; border: 0; }
+            .touch-blocker {
+              position: absolute;
+              top: 0;
+              left: 0;
+              right: 0;
+              bottom: 48px;
+              z-index: 10;
+              background: transparent;
+            }
           </style>
           <script src="https://player.vimeo.com/api/player.js"></script>
         </head>
-        <body>
+        <body oncontextmenu="return false;">
           <div class="player-wrap">
             <iframe
               id="player_vimeo"
@@ -273,12 +327,32 @@ function generateVideoHtml(parsed: ParsedVideo, rawCode?: string | null): string
               allow="autoplay; fullscreen; picture-in-picture"
               allowfullscreen
             ></iframe>
+            <div id="touch_blocker_vm" class="touch-blocker"></div>
           </div>
           <script>
+            window.addEventListener('contextmenu', function(e) { e.preventDefault(); e.stopPropagation(); return false; }, true);
+            document.addEventListener('contextmenu', function(e) { e.preventDefault(); e.stopPropagation(); return false; }, true);
+
             var vimeoPlayer;
             try {
               vimeoPlayer = new Vimeo.Player('player_vimeo');
             } catch(e) {}
+
+            var blockerVm = document.getElementById('touch_blocker_vm');
+            if (blockerVm) {
+              blockerVm.addEventListener('contextmenu', function(e) { e.preventDefault(); e.stopPropagation(); return false; });
+              var startVm = 0, movedVm = false;
+              blockerVm.addEventListener('touchstart', function() { startVm = Date.now(); movedVm = false; }, { passive: true });
+              blockerVm.addEventListener('touchmove', function() { movedVm = true; }, { passive: true });
+              blockerVm.addEventListener('touchend', function() {
+                if (!movedVm && (Date.now() - startVm < 350) && vimeoPlayer) {
+                  vimeoPlayer.getPaused().then(function(paused) {
+                    if (paused) vimeoPlayer.play();
+                    else vimeoPlayer.pause();
+                  });
+                }
+              });
+            }
 
             window.handlePlayerCommand = function(cmd) {
               if (!vimeoPlayer) return;
@@ -322,12 +396,20 @@ function generateVideoHtml(parsed: ParsedVideo, rawCode?: string | null): string
         <head>
           <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
           <style>
-            * { margin: 0; padding: 0; box-sizing: border-box; }
+            * {
+              margin: 0;
+              padding: 0;
+              box-sizing: border-box;
+              -webkit-touch-callout: none !important;
+              -webkit-user-select: none !important;
+              user-select: none !important;
+              -webkit-tap-highlight-color: transparent !important;
+            }
             body, html { width: 100vw; height: 100vh; min-height: 100vh; background: #000; overflow: hidden; display: flex; align-items: center; justify-content: center; }
             video { width: 100vw; height: 100vh; object-fit: contain; }
           </style>
         </head>
-        <body>
+        <body oncontextmenu="return false;">
           <video
             id="player_direct"
             src="${parsed.embedUrl}"
@@ -336,8 +418,12 @@ function generateVideoHtml(parsed: ParsedVideo, rawCode?: string | null): string
             playsinline
             webkit-playsinline
             preload="auto"
+            oncontextmenu="return false;"
           ></video>
           <script>
+            window.addEventListener('contextmenu', function(e) { e.preventDefault(); e.stopPropagation(); return false; }, true);
+            document.addEventListener('contextmenu', function(e) { e.preventDefault(); e.stopPropagation(); return false; }, true);
+
             var videoEl = document.getElementById('player_direct');
             window.handlePlayerCommand = function(cmd) {
               if (!videoEl) return;
@@ -379,13 +465,25 @@ function generateVideoHtml(parsed: ParsedVideo, rawCode?: string | null): string
           <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
           <meta name="referrer" content="always">
           <style>
-            * { margin: 0; padding: 0; box-sizing: border-box; }
+            * {
+              margin: 0;
+              padding: 0;
+              box-sizing: border-box;
+              -webkit-touch-callout: none !important;
+              -webkit-user-select: none !important;
+              user-select: none !important;
+              -webkit-tap-highlight-color: transparent !important;
+            }
             body, html { width: 100vw; height: 100vh; min-height: 100vh; background: #000; overflow: hidden; display: flex; align-items: center; justify-content: center; }
             iframe { width: 100vw; height: 100vh; border: 0; }
           </style>
         </head>
-        <body>
+        <body oncontextmenu="return false;">
           ${content}
+          <script>
+            window.addEventListener('contextmenu', function(e) { e.preventDefault(); e.stopPropagation(); return false; }, true);
+            document.addEventListener('contextmenu', function(e) { e.preventDefault(); e.stopPropagation(); return false; }, true);
+          </script>
         </body>
       </html>
     `;
@@ -956,6 +1054,7 @@ export const LessonPlayerScreen: React.FC<{ route: any; navigation: any }> = ({
                 baseUrl: 'https://academy.tmminnovation.com',
               }}
               style={styles.webview}
+              menuItems={[]}
               allowsFullscreenVideo
               javaScriptEnabled
               domStorageEnabled
