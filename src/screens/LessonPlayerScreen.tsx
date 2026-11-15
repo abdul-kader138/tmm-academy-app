@@ -882,13 +882,7 @@ export const LessonPlayerScreen: React.FC<{ route: any; navigation: any }> = ({
             <Text style={styles.fullscreenLessonTitle} numberOfLines={1}>
               {lesson?.title || 'Lesson Video'}
             </Text>
-            <TouchableOpacity
-              style={styles.fullscreenBackBtn}
-              onPress={() => void toggleFullscreen(false)}
-              activeOpacity={0.7}
-            >
-              <Ionicons name="contract" size={20} color="#FFFFFF" />
-            </TouchableOpacity>
+            <View style={{ width: 38 }} />
           </View>
         )}
 
@@ -1054,6 +1048,28 @@ export const LessonPlayerScreen: React.FC<{ route: any; navigation: any }> = ({
               </View>
               <Text style={styles.hudPercentText}>{Math.round(hudState.value * 100)}%</Text>
             </View>
+          </View>
+        )}
+
+        {/* Fullscreen Bottom Exit Button (Auto-hides along with header) */}
+        {isFullscreen && showFullscreenHeader && (
+          <View
+            style={[
+              styles.fullscreenBottomExitRow,
+              {
+                bottom: Math.max(16, insets.bottom + 12),
+                right: Math.max(20, insets.right + 14),
+              },
+            ]}
+            pointerEvents="box-none"
+          >
+            <TouchableOpacity
+              style={styles.fullscreenExitBtn}
+              onPress={() => void toggleFullscreen(false)}
+              activeOpacity={0.8}
+            >
+              <Ionicons name="contract" size={22} color="#FFFFFF" />
+            </TouchableOpacity>
           </View>
         )}
       </View>
@@ -2219,6 +2235,20 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '700',
     marginHorizontal: 12,
+  },
+  fullscreenBottomExitRow: {
+    position: 'absolute',
+    zIndex: 40,
+  },
+  fullscreenExitBtn: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: 'rgba(0, 0, 0, 0.65)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.25)',
   },
   fullscreenControlsRow: {
     position: 'absolute',
