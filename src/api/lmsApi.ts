@@ -592,15 +592,40 @@ class LmsApiClient {
     if (!res.data) return null;
     const lesson = res.data.lesson || res.data.data || res.data;
     if (lesson && typeof lesson === 'object') {
-      if (!lesson.video_url) {
-        lesson.video_url =
-          lesson.video_link ||
-          lesson.video ||
-          lesson.embed_url ||
-          lesson.embed_code ||
-          lesson.stream_url ||
-          null;
+      const rawEmbed =
+        lesson.video_embed_url ||
+        res.data.video_embed_url ||
+        lesson.embed_url ||
+        res.data.embed_url ||
+        lesson.embed_code ||
+        res.data.embed_code;
+
+      const rawUrl =
+        lesson.video_url ||
+        res.data.video_url ||
+        lesson.video_link ||
+        res.data.video_link ||
+        lesson.video ||
+        res.data.video ||
+        lesson.stream_url ||
+        res.data.stream_url;
+
+      lesson.video_embed_url = rawEmbed || null;
+      lesson.video_url = rawEmbed || rawUrl || null;
+
+      const provider = String(lesson.video_provider || res.data.video_provider || '').toLowerCase();
+      const vidId = lesson.video_id || res.data.video_id;
+
+      if (provider === 'vimeo' || (!lesson.youtube_id && vidId)) {
+        lesson.vimeo_id = lesson.vimeo_id || vidId;
       }
+      if (provider === 'youtube') {
+        lesson.youtube_id = lesson.youtube_id || vidId;
+      }
+
+      lesson.video_provider = provider || (lesson.vimeo_id ? 'vimeo' : lesson.youtube_id ? 'youtube' : null);
+      lesson.video_id = vidId || lesson.vimeo_id || lesson.youtube_id || null;
+
       if (Array.isArray(res.data.comments)) {
         lesson.comments = res.data.comments;
       }

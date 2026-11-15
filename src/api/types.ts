@@ -133,10 +133,15 @@ export interface LessonDetail {
   slug?: string;
   title: string;
   summary?: string;
+  summary_html?: string;
+  summary_text?: string;
   description?: string;
-  video_url?: string;
-  vimeo_id?: string | number;
-  youtube_id?: string;
+  video_url?: string | null;
+  video_embed_url?: string | null;
+  video_provider?: 'vimeo' | 'youtube' | string | null;
+  video_id?: string | number | null;
+  vimeo_id?: string | number | null;
+  youtube_id?: string | null;
   video_type?: 'vimeo' | 'youtube' | 'direct' | string;
   duration_minutes?: number;
   duration_seconds?: number;
