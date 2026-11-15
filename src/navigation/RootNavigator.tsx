@@ -125,6 +125,7 @@ export const RootNavigator: React.FC = () => {
   return (
     <NavigationContainer theme={navTheme}>
       <Stack.Navigator
+        key={user ? 'auth_user' : 'guest_user'}
         initialRouteName={user ? 'MainTabs' : 'Welcome'}
         screenOptions={{
           headerShown: false,

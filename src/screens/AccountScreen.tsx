@@ -171,7 +171,8 @@ export const AccountScreen: React.FC<{ navigation: any }> = ({ navigation }) => 
         style: 'destructive',
         onPress: async () => {
           await logout();
-          navigation.reset({ index: 0, routes: [{ name: 'Welcome' }] });
+          const rootNav = navigation.getParent() || navigation;
+          rootNav.reset({ index: 0, routes: [{ name: 'Welcome' }] });
         },
       },
     ]);
