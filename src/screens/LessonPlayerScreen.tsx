@@ -1240,8 +1240,7 @@ export const LessonPlayerScreen: React.FC<{ route: any; navigation: any }> = ({
             onPress={() => void toggleFullscreen(true)}
             activeOpacity={0.7}
           >
-            <Ionicons name="expand" size={16} color="#38BDF8" />
-            <Text style={styles.quickFsBtnText}>Fullscreen</Text>
+            <Ionicons name="expand" size={18} color="#38BDF8" />
           </TouchableOpacity>
         </View>
       )}
@@ -2307,11 +2306,9 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(14, 116, 144, 0.2)',
     borderWidth: 1,
     borderColor: Colors.signal,
-  },
-  quickFsBtnText: {
-    color: '#38BDF8',
-    fontSize: 12,
-    fontWeight: '700',
+    paddingHorizontal: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   fullscreenContainer: {
     position: 'absolute',
