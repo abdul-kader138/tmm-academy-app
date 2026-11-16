@@ -19,7 +19,6 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Colors, cardShadow } from '../theme/colors';
 import { lmsApi, API_BASE_URL } from '../api/lmsApi';
 import { CourseCatalogItem, CourseDetail } from '../api/types';
-import { useAuth } from '../context/AuthContext';
 import { getCoursePricing } from '../utils/pricing';
 import { cleanHtml } from '../utils/text';
 
@@ -29,7 +28,6 @@ export const CourseDetailScreen: React.FC<{ route: any; navigation: any }> = ({
 }) => {
   const insets = useSafeAreaInsets();
   const isFocused = useIsFocused();
-  const { user } = useAuth();
   const initialCourse: CourseCatalogItem = route.params?.course;
   const [detail, setDetail] = useState<CourseDetail | null>(null);
   const [loading, setLoading] = useState(true);
@@ -470,7 +468,13 @@ export const CourseDetailScreen: React.FC<{ route: any; navigation: any }> = ({
             style={styles.webAdmissionBtn}
             activeOpacity={0.85}
             onPress={() => {
-              void Linking.openURL(`https://academy.tmminnovation.com/courses/${course.slug}`);
+              const slug = course?.slug || '';
+              const targetUrl = slug
+                ? `https://academy.tmminnovation.com/courses/${slug}`
+                : 'https://academy.tmminnovation.com';
+              Linking.openURL(targetUrl).catch(() => {
+                Alert.alert('Notice', 'Unable to open the web portal. Please visit academy.tmminnovation.com in your browser.');
+              });
             }}
           >
             <Ionicons name="globe-outline" size={16} color={Colors.signal} />
