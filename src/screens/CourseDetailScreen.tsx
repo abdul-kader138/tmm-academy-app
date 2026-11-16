@@ -464,22 +464,10 @@ export const CourseDetailScreen: React.FC<{ route: any; navigation: any }> = ({
             <Ionicons name="arrow-forward" size={16} color="#FFFFFF" />
           </TouchableOpacity>
         ) : (
-          <TouchableOpacity
-            style={styles.webAdmissionBtn}
-            activeOpacity={0.85}
-            onPress={() => {
-              const slug = course?.slug || '';
-              const targetUrl = slug
-                ? `https://academy.tmminnovation.com/courses/${slug}`
-                : 'https://academy.tmminnovation.com';
-              Linking.openURL(targetUrl).catch(() => {
-                Alert.alert('Notice', 'Unable to open the web portal. Please visit academy.tmminnovation.com in your browser.');
-              });
-            }}
-          >
-            <Ionicons name="globe-outline" size={16} color={Colors.signal} />
-            <Text style={styles.webAdmissionBtnText}>Enroll via Web</Text>
-          </TouchableOpacity>
+          <View style={styles.webAdmissionBadge}>
+            <Ionicons name="globe-outline" size={15} color={Colors.signal} />
+            <Text style={styles.webAdmissionBadgeText}>Enroll via Web</Text>
+          </View>
         )}
       </View>
     </View>
@@ -815,18 +803,14 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '700',
   },
-  webAdmissionBtn: {
+  webAdmissionBadge: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderRadius: 12,
-    backgroundColor: '#F0FDFA',
-    borderWidth: 1,
-    borderColor: '#99F6E4',
+    paddingHorizontal: 4,
+    paddingVertical: 6,
   },
-  webAdmissionBtnText: {
+  webAdmissionBadgeText: {
     color: Colors.signal,
     fontSize: 13,
     fontWeight: '700',
