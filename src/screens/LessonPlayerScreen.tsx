@@ -1205,7 +1205,7 @@ export const LessonPlayerScreen: React.FC<{ route: any; navigation: any }> = ({
             onPress={() => handleSeek(-10)}
             activeOpacity={0.7}
           >
-            <Ionicons name="play-back" size={15} color="#E2E8F0" />
+            <Ionicons name="play-back" size={16} color="#FFFFFF" />
             <Text style={styles.quickCtrlBtnText}>10s</Text>
           </TouchableOpacity>
 
@@ -1214,7 +1214,7 @@ export const LessonPlayerScreen: React.FC<{ route: any; navigation: any }> = ({
             onPress={handleTogglePlay}
             activeOpacity={0.8}
           >
-            <Ionicons name={isPlaying ? 'pause' : 'play'} size={17} color="#FFFFFF" />
+            <Ionicons name={isPlaying ? 'pause' : 'play'} size={18} color="#FFFFFF" />
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -1222,7 +1222,7 @@ export const LessonPlayerScreen: React.FC<{ route: any; navigation: any }> = ({
             onPress={() => handleSeek(10)}
             activeOpacity={0.7}
           >
-            <Ionicons name="play-forward" size={15} color="#E2E8F0" />
+            <Ionicons name="play-forward" size={16} color="#FFFFFF" />
             <Text style={styles.quickCtrlBtnText}>10s</Text>
           </TouchableOpacity>
 
@@ -1231,7 +1231,7 @@ export const LessonPlayerScreen: React.FC<{ route: any; navigation: any }> = ({
             onPress={handleCycleSpeed}
             activeOpacity={0.7}
           >
-            <Ionicons name="speedometer-outline" size={14} color="#38BDF8" />
+            <Ionicons name="speedometer-outline" size={15} color="#FFFFFF" />
             <Text style={styles.quickSpeedBtnText}>{currentSpeed}x</Text>
           </TouchableOpacity>
 
@@ -1240,7 +1240,7 @@ export const LessonPlayerScreen: React.FC<{ route: any; navigation: any }> = ({
             onPress={() => void toggleFullscreen(true)}
             activeOpacity={0.7}
           >
-            <Ionicons name="expand" size={18} color="#38BDF8" />
+            <Ionicons name="expand" size={18} color="#FFFFFF" />
           </TouchableOpacity>
         </View>
       )}
@@ -2267,46 +2267,41 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: '#0F172A',
+    backgroundColor: '#000000',
     paddingHorizontal: 12,
     paddingVertical: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: '#1E293B',
   },
   quickCtrlBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
+    paddingHorizontal: 11,
+    paddingVertical: 7,
     borderRadius: 8,
-    backgroundColor: '#1E293B',
+    backgroundColor: 'rgba(255, 255, 255, 0.12)',
   },
   quickCtrlBtnText: {
-    color: '#E2E8F0',
+    color: '#FFFFFF',
     fontSize: 12,
     fontWeight: '700',
   },
   quickPlayBtn: {
-    backgroundColor: Colors.signal,
-    paddingHorizontal: 14,
-    paddingVertical: 6,
+    backgroundColor: 'rgba(255, 255, 255, 0.22)',
+    paddingHorizontal: 15,
+    paddingVertical: 7,
   },
   quickSpeedBtn: {
-    backgroundColor: 'rgba(14, 116, 144, 0.2)',
-    borderWidth: 1,
-    borderColor: Colors.signal,
+    backgroundColor: 'rgba(255, 255, 255, 0.12)',
   },
   quickSpeedBtnText: {
-    color: '#38BDF8',
+    color: '#FFFFFF',
     fontSize: 12,
-    fontWeight: '800',
+    fontWeight: '700',
   },
   quickFsBtn: {
-    backgroundColor: 'rgba(14, 116, 144, 0.2)',
-    borderWidth: 1,
-    borderColor: Colors.signal,
-    paddingHorizontal: 10,
+    backgroundColor: 'rgba(255, 255, 255, 0.12)',
+    paddingHorizontal: 11,
+    paddingVertical: 7,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -2358,11 +2353,9 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: 'rgba(0, 0, 0, 0.65)',
+    backgroundColor: 'rgba(0, 0, 0, 0.75)',
     justifyContent: 'center',
     alignItems: 'center',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.25)',
   },
   fullscreenControlsRow: {
     position: 'absolute',
