@@ -233,7 +233,14 @@ export const DashboardScreen: React.FC<{ navigation: any }> = ({ navigation }) =
         ) : enrolledCourses.length > 0 ? (
           <View style={styles.courseProgressList}>
             {enrolledCourses.map((c) => (
-              <View key={c.id} style={[styles.activeCourseCard, cardShadow(2)]}>
+              <TouchableOpacity
+                key={c.id}
+                style={[styles.activeCourseCard, cardShadow(2)]}
+                activeOpacity={0.85}
+                onPress={() =>
+                  navigation.navigate('CourseDetail', { course: c })
+                }
+              >
                 <View style={styles.cardTopRow}>
                   <Text style={styles.activeCourseTitle} numberOfLines={1}>
                     {c.title}
@@ -277,7 +284,7 @@ export const DashboardScreen: React.FC<{ navigation: any }> = ({ navigation }) =
                     />
                   </TouchableOpacity>
                 </View>
-              </View>
+              </TouchableOpacity>
             ))}
           </View>
         ) : (

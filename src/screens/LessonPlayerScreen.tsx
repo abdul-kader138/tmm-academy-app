@@ -12,6 +12,7 @@ import {
   Linking,
   PanResponder,
   Dimensions,
+  useWindowDimensions,
   BackHandler,
 } from 'react-native';
 import { WebView } from 'react-native-webview';
@@ -184,9 +185,23 @@ function parseVideo(
 
 function generateVideoHtml(parsed: ParsedVideo, rawCode?: string | null): string | null {
   if (parsed.type === 'youtube' && parsed.embedUrl) {
-    const embedUrl = parsed.embedUrl.includes('enablejsapi=1')
-      ? parsed.embedUrl
-      : `${parsed.embedUrl}${parsed.embedUrl.includes('?') ? '&' : '?'}enablejsapi=1&playsinline=1&controls=1&modestbranding=1`;
+    const separator = parsed.embedUrl.includes('?') ? '&' : '?';
+    let embedUrl = parsed.embedUrl;
+    if (!embedUrl.includes('enablejsapi=1')) {
+      embedUrl = `${embedUrl}${separator}enablejsapi=1`;
+    }
+    if (!embedUrl.includes('origin=')) {
+      embedUrl = `${embedUrl}&origin=https://academy.tmminnovation.com`;
+    }
+    if (!embedUrl.includes('playsinline=1')) {
+      embedUrl = `${embedUrl}&playsinline=1`;
+    }
+    if (!embedUrl.includes('controls=')) {
+      embedUrl = `${embedUrl}&controls=1`;
+    }
+    if (!embedUrl.includes('modestbranding=')) {
+      embedUrl = `${embedUrl}&modestbranding=1`;
+    }
 
     return `
       <!DOCTYPE html>
@@ -208,6 +223,26 @@ function generateVideoHtml(parsed: ParsedVideo, rawCode?: string | null): string
             .player-wrap { position: relative; width: 100vw; height: 100vh; }
             iframe { position: absolute; top: 0; left: 0; width: 100vw; height: 100vh; border: 0; }
           </style>
+          <script>
+            window.ytPlayer = null;
+            window.ytReady = false;
+            function onYouTubeIframeAPIReady() {
+              try {
+                window.ytPlayer = new YT.Player('player_yt', {
+                  events: {
+                    'onReady': function() {
+                      window.ytReady = true;
+                      try {
+                        if (window.ReactNativeWebView && window.ReactNativeWebView.postMessage) {
+                          window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'YT_READY' }));
+                        }
+                      } catch(e) {}
+                    }
+                  }
+                });
+              } catch(e) {}
+            }
+          </script>
           <script src="https://www.youtube.com/iframe_api"></script>
         </head>
         <body oncontextmenu="return false;">
@@ -224,35 +259,108 @@ function generateVideoHtml(parsed: ParsedVideo, rawCode?: string | null): string
             window.addEventListener('contextmenu', function(e) { e.preventDefault(); e.stopPropagation(); return false; }, true);
             document.addEventListener('contextmenu', function(e) { e.preventDefault(); e.stopPropagation(); return false; }, true);
 
-            var ytPlayer;
-            function onYouTubeIframeAPIReady() {
-              ytPlayer = new YT.Player('player_yt', {
-                events: {
-                  'onReady': function() {}
-                }
-              });
-            }
-
             window.handlePlayerCommand = function(cmd) {
-              if (!ytPlayer) return;
               try {
-                if (cmd.action === 'seek') {
-                  var cur = (ytPlayer.getCurrentTime && typeof ytPlayer.getCurrentTime === 'function') ? ytPlayer.getCurrentTime() : 0;
-                  ytPlayer.seekTo(Math.max(0, cur + cmd.offset), true);
+                var iframe = document.getElementById('player_yt') || document.querySelector('iframe');
+                if (window.ReactNativeWebView && window.ReactNativeWebView.postMessage) {
+                  window.ReactNativeWebView.postMessage(JSON.stringify({
+                    type: 'HANDLE_CMD',
+                    action: cmd.action,
+                    volume: cmd.volume,
+                    hasIframe: !!iframe,
+                    hasYtPlayer: !!window.ytPlayer
+                  }));
+                }
+
+                if (cmd.action === 'setVolume') {
+                  var vol = Math.max(0, Math.min(100, Math.round(cmd.volume * 100)));
+
+                  // 1. Direct postMessage to YouTube iframe
+                  if (iframe && iframe.contentWindow) {
+                    iframe.contentWindow.postMessage(JSON.stringify({
+                      event: 'command',
+                      func: 'setVolume',
+                      args: [vol]
+                    }), '*');
+
+                    if (vol === 0) {
+                      iframe.contentWindow.postMessage(JSON.stringify({
+                        event: 'command',
+                        func: 'mute',
+                        args: []
+                      }), '*');
+                    } else {
+                      iframe.contentWindow.postMessage(JSON.stringify({
+                        event: 'command',
+                        func: 'unMute',
+                        args: []
+                      }), '*');
+                    }
+                  }
+
+                  // 2. YT.Player API if available
+                  if (window.ytPlayer && typeof window.ytPlayer.setVolume === 'function') {
+                    window.ytPlayer.setVolume(vol);
+                    if (vol === 0 && window.ytPlayer.mute) window.ytPlayer.mute();
+                    else if (window.ytPlayer.unMute) window.ytPlayer.unMute();
+                  }
+
+                  // 3. HTML5 Video tags if present
+                  var vids = document.querySelectorAll('video');
+                  for (var i = 0; i < vids.length; i++) {
+                    vids[i].volume = Math.max(0, Math.min(1, cmd.volume));
+                    vids[i].muted = (cmd.volume === 0);
+                  }
+                } else if (cmd.action === 'seek') {
+                  if (window.ytPlayer && typeof window.ytPlayer.getCurrentTime === 'function' && typeof window.ytPlayer.seekTo === 'function') {
+                    var cur = window.ytPlayer.getCurrentTime() || 0;
+                    window.ytPlayer.seekTo(Math.max(0, cur + cmd.offset), true);
+                  }
                 } else if (cmd.action === 'setSpeed') {
-                  if (ytPlayer.setPlaybackRate) ytPlayer.setPlaybackRate(cmd.speed);
-                } else if (cmd.action === 'setVolume') {
-                  if (ytPlayer.setVolume) ytPlayer.setVolume(Math.round(cmd.volume * 100));
-                  if (cmd.volume === 0) { if (ytPlayer.mute) ytPlayer.mute(); }
-                  else { if (ytPlayer.unMute) ytPlayer.unMute(); }
+                  if (iframe && iframe.contentWindow) {
+                    iframe.contentWindow.postMessage(JSON.stringify({
+                      event: 'command',
+                      func: 'setPlaybackRate',
+                      args: [cmd.speed]
+                    }), '*');
+                  }
+                  if (window.ytPlayer && typeof window.ytPlayer.setPlaybackRate === 'function') {
+                    window.ytPlayer.setPlaybackRate(cmd.speed);
+                  }
                 } else if (cmd.action === 'play') {
-                  if (ytPlayer.playVideo) ytPlayer.playVideo();
+                  if (iframe && iframe.contentWindow) {
+                    iframe.contentWindow.postMessage(JSON.stringify({
+                      event: 'command',
+                      func: 'playVideo',
+                      args: []
+                    }), '*');
+                  }
+                  if (window.ytPlayer && typeof window.ytPlayer.playVideo === 'function') {
+                    window.ytPlayer.playVideo();
+                  }
                 } else if (cmd.action === 'pause') {
-                  if (ytPlayer.pauseVideo) ytPlayer.pauseVideo();
+                  if (iframe && iframe.contentWindow) {
+                    iframe.contentWindow.postMessage(JSON.stringify({
+                      event: 'command',
+                      func: 'pauseVideo',
+                      args: []
+                    }), '*');
+                  }
+                  if (window.ytPlayer && typeof window.ytPlayer.pauseVideo === 'function') {
+                    window.ytPlayer.pauseVideo();
+                  }
                 } else if (cmd.action === 'togglePlay') {
-                  var state = (ytPlayer.getPlayerState && typeof ytPlayer.getPlayerState === 'function') ? ytPlayer.getPlayerState() : 1;
-                  if (state === 1) ytPlayer.pauseVideo();
-                  else ytPlayer.playVideo();
+                  if (window.ytPlayer && typeof window.ytPlayer.getPlayerState === 'function') {
+                    var state = window.ytPlayer.getPlayerState();
+                    if (state === 1) window.ytPlayer.pauseVideo();
+                    else window.ytPlayer.playVideo();
+                  } else if (iframe && iframe.contentWindow) {
+                    iframe.contentWindow.postMessage(JSON.stringify({
+                      event: 'command',
+                      func: 'pauseVideo',
+                      args: []
+                    }), '*');
+                  }
                 }
               } catch(e) {}
             };
@@ -425,7 +533,7 @@ function generateVideoHtml(parsed: ParsedVideo, rawCode?: string | null): string
   }
 
   if (parsed.type === 'embed') {
-    const content = parsed.isIframeCode && rawCode ? rawCode : `<iframe src="${parsed.embedUrl}" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen" allowfullscreen></iframe>`;
+    const content = parsed.isIframeCode && rawCode ? rawCode : `<iframe id="player_embed" src="${parsed.embedUrl}" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen" allowfullscreen></iframe>`;
     return `
       <!DOCTYPE html>
       <html>
@@ -451,6 +559,34 @@ function generateVideoHtml(parsed: ParsedVideo, rawCode?: string | null): string
           <script>
             window.addEventListener('contextmenu', function(e) { e.preventDefault(); e.stopPropagation(); return false; }, true);
             document.addEventListener('contextmenu', function(e) { e.preventDefault(); e.stopPropagation(); return false; }, true);
+
+            window.handlePlayerCommand = function(cmd) {
+              try {
+                var iframe = document.getElementById('player_embed') || document.querySelector('iframe');
+                if (cmd.action === 'setVolume') {
+                  var vol = Math.max(0, Math.min(100, Math.round(cmd.volume * 100)));
+                  if (iframe && iframe.contentWindow) {
+                    iframe.contentWindow.postMessage(JSON.stringify({ event: 'command', func: 'setVolume', args: [vol] }), '*');
+                    if (vol === 0) {
+                      iframe.contentWindow.postMessage(JSON.stringify({ event: 'command', func: 'mute', args: [] }), '*');
+                    } else {
+                      iframe.contentWindow.postMessage(JSON.stringify({ event: 'command', func: 'unMute', args: [] }), '*');
+                    }
+                  }
+                  var vids = document.querySelectorAll('video');
+                  for (var i = 0; i < vids.length; i++) {
+                    vids[i].volume = Math.max(0, Math.min(1, cmd.volume));
+                    vids[i].muted = (cmd.volume === 0);
+                  }
+                }
+              } catch(e) {}
+            };
+            document.addEventListener('message', function(e) {
+              try { window.handlePlayerCommand(JSON.parse(e.data)); } catch(err){}
+            });
+            window.addEventListener('message', function(e) {
+              try { window.handlePlayerCommand(JSON.parse(e.data)); } catch(err){}
+            });
           </script>
         </body>
       </html>
@@ -486,7 +622,15 @@ export const LessonPlayerScreen: React.FC<{ route: any; navigation: any }> = ({
   const webViewRef = useRef<any>(null);
   const [currentSpeed, setCurrentSpeed] = useState(1.0);
   const [isPlaying, setIsPlaying] = useState(true);
-  const [isFullscreen, setIsFullscreen] = useState(false);
+
+  const { width: windowWidth, height: windowHeight } = useWindowDimensions();
+  const isLandscape = windowWidth > windowHeight;
+  const [isFullscreen, setIsFullscreen] = useState(isLandscape);
+
+  // Sync fullscreen state with device orientation / window dimensions
+  useEffect(() => {
+    setIsFullscreen(isLandscape);
+  }, [isLandscape]);
 
   // Gesture Brightness (0.05 to 1.0) & Volume (0.0 to 1.0)
   const [brightness, setBrightness] = useState(0.7);
@@ -497,9 +641,21 @@ export const LessonPlayerScreen: React.FC<{ route: any; navigation: any }> = ({
   });
   const hudTimerRef = useRef<any>(null);
 
+  const isFullscreenRef = useRef(isFullscreen);
+  isFullscreenRef.current = isFullscreen;
+
+  const brightnessRef = useRef(brightness);
+  brightnessRef.current = brightness;
+
+  const volumeRef = useRef(volume);
+  volumeRef.current = volume;
+
   const dragStartBrightnessRef = useRef(0.7);
   const dragStartVolumeRef = useRef(0.7);
   const dragSideRef = useRef<'left' | 'right'>('left');
+  const touchStartTimeRef = useRef(0);
+  const hasMovedRef = useRef(false);
+
   const containerDimensionsRef = useRef({
     width: Dimensions.get('window').width,
     height: 240,
@@ -530,88 +686,6 @@ export const LessonPlayerScreen: React.FC<{ route: any; navigation: any }> = ({
     sendPlayerCommand({ action: 'setSpeed', speed: nextSpeed });
   }, [currentSpeed, sendPlayerCommand]);
 
-  const panResponder = useRef(
-    PanResponder.create({
-      onStartShouldSetPanResponder: () => false,
-      onStartShouldSetPanResponderCapture: () => false,
-      onMoveShouldSetPanResponder: (_, gestureState) => isFullscreen && Math.abs(gestureState.dy) > 8,
-      onMoveShouldSetPanResponderCapture: (_, gestureState) => isFullscreen && Math.abs(gestureState.dy) > 8,
-      onPanResponderGrant: (evt) => {
-        const { locationX } = evt.nativeEvent;
-        const width = containerDimensionsRef.current.width || Dimensions.get('window').width;
-        dragSideRef.current = locationX < width / 2 ? 'left' : 'right';
-        dragStartBrightnessRef.current = brightness;
-        dragStartVolumeRef.current = volume;
-
-        if (hudTimerRef.current) {
-          clearTimeout(hudTimerRef.current);
-          hudTimerRef.current = null;
-        }
-      },
-      onPanResponderMove: (_, gestureState) => {
-        const delta = -gestureState.dy / 180;
-        if (dragSideRef.current === 'left') {
-          const next = Math.min(1.0, Math.max(0.05, dragStartBrightnessRef.current + delta));
-          setBrightness(next);
-          setHudState({ type: 'brightness', value: next });
-          Brightness.setBrightnessAsync(next).catch(() => {});
-        } else {
-          const next = Math.min(1.0, Math.max(0.0, dragStartVolumeRef.current + delta));
-          setVolume(next);
-          setHudState({ type: 'volume', value: next });
-          if (VolumeManager?.setVolume) {
-            VolumeManager.setVolume(next, { showUI: false }).catch(() => {});
-          }
-          sendPlayerCommand({ action: 'setVolume', volume: next });
-        }
-      },
-      onPanResponderRelease: () => {
-        if (hudTimerRef.current) clearTimeout(hudTimerRef.current);
-        hudTimerRef.current = setTimeout(() => {
-          setHudState({ type: null, value: 0 });
-        }, 1200);
-      },
-    })
-  ).current;
-
-  // Screen Brightness & Volume Hardware Sync
-  useEffect(() => {
-    if (isFullscreen) {
-      Brightness.getBrightnessAsync()
-        .then((val) => {
-          if (typeof val === 'number' && !isNaN(val)) {
-            const safeB = Math.min(1.0, Math.max(0.05, val));
-            setBrightness(safeB);
-            dragStartBrightnessRef.current = safeB;
-          }
-        })
-        .catch(() => {});
-
-      if (VolumeManager?.getVolume) {
-        VolumeManager.getVolume()
-          .then((res: any) => {
-            const v = typeof res === 'number' ? res : res?.volume;
-            if (typeof v === 'number' && !isNaN(v)) {
-              const safeV = Math.min(1.0, Math.max(0.0, v));
-              setVolume(safeV);
-              dragStartVolumeRef.current = safeV;
-            }
-          })
-          .catch(() => {});
-      }
-    } else {
-      Brightness.restoreSystemBrightnessAsync().catch(() => {});
-    }
-  }, [isFullscreen]);
-
-  useEffect(() => {
-    return () => {
-      Brightness.restoreSystemBrightnessAsync().catch(() => {});
-      if (hudTimerRef.current) clearTimeout(hudTimerRef.current);
-      if (headerTimerRef.current) clearTimeout(headerTimerRef.current);
-    };
-  }, []);
-
   // Fullscreen header auto-hide (shows for 3.5s on entry or single tap, then hides)
   const [showFullscreenHeader, setShowFullscreenHeader] = useState(false);
   const headerTimerRef = useRef<any>(null);
@@ -634,6 +708,123 @@ export const LessonPlayerScreen: React.FC<{ route: any; navigation: any }> = ({
       return next;
     });
   }, [triggerHeaderAutoHide]);
+
+  const handleToggleFullscreenHeaderRef = useRef(handleToggleFullscreenHeader);
+  handleToggleFullscreenHeaderRef.current = handleToggleFullscreenHeader;
+
+  const panResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onStartShouldSetPanResponderCapture: () => false,
+      onMoveShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponderCapture: () => false,
+      onPanResponderGrant: (evt) => {
+        const { pageX, locationX } = evt.nativeEvent;
+        touchStartTimeRef.current = Date.now();
+        hasMovedRef.current = false;
+
+        const screenWidth = Math.max(Dimensions.get('window').width, Dimensions.get('window').height);
+        const touchX = typeof pageX === 'number' && pageX > 0 ? pageX : (locationX || 0);
+        dragSideRef.current = touchX < screenWidth / 2 ? 'left' : 'right';
+        dragStartBrightnessRef.current = brightnessRef.current;
+        dragStartVolumeRef.current = volumeRef.current;
+
+        if (hudTimerRef.current) {
+          clearTimeout(hudTimerRef.current);
+          hudTimerRef.current = null;
+        }
+      },
+      onPanResponderMove: (_, gestureState) => {
+        if (Math.abs(gestureState.dy) > 2) {
+          hasMovedRef.current = true;
+        }
+
+        // 180dp travel covers 0 to 100% smoothly
+        const delta = -gestureState.dy / 180;
+
+        if (dragSideRef.current === 'left') {
+          // Brightness on left half
+          const next = Math.min(1.0, Math.max(0.05, dragStartBrightnessRef.current + delta));
+          setBrightness(next);
+          brightnessRef.current = next;
+          setHudState({ type: 'brightness', value: next });
+          Brightness.setBrightnessAsync(next).catch(() => {});
+        } else {
+          // Volume on right half
+          const next = Math.min(1.0, Math.max(0.0, dragStartVolumeRef.current + delta));
+          setVolume(next);
+          volumeRef.current = next;
+          setHudState({ type: 'volume', value: next });
+          if (VolumeManager?.setVolume) {
+            VolumeManager.setVolume(next, { showUI: false }).catch(() => {});
+          }
+          sendPlayerCommand({ action: 'setVolume', volume: next });
+        }
+      },
+      onPanResponderRelease: (_, gestureState) => {
+        const elapsed = Date.now() - touchStartTimeRef.current;
+        const isTap =
+          !hasMovedRef.current ||
+          (Math.abs(gestureState.dx) < 8 && Math.abs(gestureState.dy) < 8);
+
+        if (isTap && elapsed < 350) {
+          // Single tap on screen: toggle controls/header
+          handleToggleFullscreenHeaderRef.current?.();
+        }
+
+        if (hudTimerRef.current) clearTimeout(hudTimerRef.current);
+        hudTimerRef.current = setTimeout(() => {
+          setHudState({ type: null, value: 0 });
+        }, 1200);
+      },
+      onPanResponderTerminate: () => {
+        if (hudTimerRef.current) clearTimeout(hudTimerRef.current);
+        hudTimerRef.current = setTimeout(() => {
+          setHudState({ type: null, value: 0 });
+        }, 1200);
+      },
+    })
+  ).current;
+
+  // Screen Brightness & Volume Hardware Sync
+  useEffect(() => {
+    if (isFullscreen) {
+      Brightness.getBrightnessAsync()
+        .then((val) => {
+          if (typeof val === 'number' && !isNaN(val)) {
+            const safeB = Math.min(1.0, Math.max(0.05, val));
+            setBrightness(safeB);
+            brightnessRef.current = safeB;
+            dragStartBrightnessRef.current = safeB;
+          }
+        })
+        .catch(() => {});
+
+      if (VolumeManager?.getVolume) {
+        VolumeManager.getVolume()
+          .then((res: any) => {
+            const v = typeof res === 'number' ? res : res?.volume;
+            if (typeof v === 'number' && !isNaN(v)) {
+              const safeV = Math.min(1.0, Math.max(0.0, v));
+              setVolume(safeV);
+              volumeRef.current = safeV;
+              dragStartVolumeRef.current = safeV;
+            }
+          })
+          .catch(() => {});
+      }
+    } else {
+      Brightness.restoreSystemBrightnessAsync().catch(() => {});
+    }
+  }, [isFullscreen]);
+
+  useEffect(() => {
+    return () => {
+      Brightness.restoreSystemBrightnessAsync().catch(() => {});
+      if (hudTimerRef.current) clearTimeout(hudTimerRef.current);
+      if (headerTimerRef.current) clearTimeout(headerTimerRef.current);
+    };
+  }, []);
 
   useEffect(() => {
     if (isFullscreen) {
@@ -681,27 +872,11 @@ export const LessonPlayerScreen: React.FC<{ route: any; navigation: any }> = ({
     [isFullscreen]
   );
 
-  // Auto-rotate on phone tilt when device auto-rotate is ON
+  // Allow auto-rotate on phone tilt when device auto-rotate is ON
   useEffect(() => {
     ScreenOrientation.unlockAsync().catch(() => {});
 
-    const orientationSub = ScreenOrientation.addOrientationChangeListener((evt) => {
-      const o = evt.orientationInfo.orientation;
-      if (
-        o === ScreenOrientation.Orientation.LANDSCAPE_LEFT ||
-        o === ScreenOrientation.Orientation.LANDSCAPE_RIGHT
-      ) {
-        setIsFullscreen(true);
-      } else if (
-        o === ScreenOrientation.Orientation.PORTRAIT_UP ||
-        o === ScreenOrientation.Orientation.PORTRAIT_DOWN
-      ) {
-        setIsFullscreen(false);
-      }
-    });
-
     return () => {
-      ScreenOrientation.removeOrientationChangeListener(orientationSub);
       ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP).catch(() => {});
       if (Platform.OS === 'android') {
         NavigationBar.setVisibilityAsync('visible').catch(() => {});
@@ -972,37 +1147,7 @@ export const LessonPlayerScreen: React.FC<{ route: any; navigation: any }> = ({
         onLayout={(e) => {
           containerDimensionsRef.current = e.nativeEvent.layout;
         }}
-        onTouchEnd={() => {
-          if (isFullscreen && !hudState.type) {
-            handleToggleFullscreenHeader();
-          }
-        }}
-        {...panResponder.panHandlers}
       >
-        {/* Fullscreen Top Header (Auto-hides after 3.5s or single tap) */}
-        {isFullscreen && showFullscreenHeader && (
-          <View
-            style={[
-              styles.fullscreenHeaderRow,
-              Platform.OS === 'ios' && {
-                paddingLeft: Math.max(16, insets.left + 8),
-                paddingRight: Math.max(16, insets.right + 8),
-              },
-            ]}
-          >
-            <TouchableOpacity
-              style={styles.fullscreenBackBtn}
-              onPress={() => void toggleFullscreen(false)}
-              activeOpacity={0.7}
-            >
-              <Ionicons name="arrow-back" size={22} color="#FFFFFF" />
-            </TouchableOpacity>
-            <Text style={styles.fullscreenLessonTitle} numberOfLines={1}>
-              {lesson?.title || 'Lesson Video'}
-            </Text>
-            <View style={{ width: 38 }} />
-          </View>
-        )}
 
         {loadingLesson ? (
           <View style={styles.videoPlaceholder}>
@@ -1086,6 +1231,14 @@ export const LessonPlayerScreen: React.FC<{ route: any; navigation: any }> = ({
               setSupportMultipleWindows={false}
               javaScriptCanOpenWindowsAutomatically={false}
               userAgent="Mozilla/5.0 (Linux; Android 14; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Mobile Safari/537.36"
+              onMessage={(syntheticEvent: any) => {
+                try {
+                  const data = JSON.parse(syntheticEvent.nativeEvent.data);
+                  console.log('[WebViewBridge]', data);
+                } catch {
+                  console.log('[WebViewBridgeRaw]', syntheticEvent.nativeEvent.data);
+                }
+              }}
               onError={(syntheticEvent: any) => {
                 const { nativeEvent } = syntheticEvent;
                 console.warn('[WebView Error]', nativeEvent);
@@ -1146,6 +1299,62 @@ export const LessonPlayerScreen: React.FC<{ route: any; navigation: any }> = ({
           ]}
         />
 
+        {/* Fullscreen Touch / Swipe Gesture Layer (Brightness left half, Volume right half, Tap toggles controls) */}
+        {isFullscreen && (
+          <View
+            collapsable={false}
+            style={styles.fullscreenGestureLayer}
+            {...panResponder.panHandlers}
+          />
+        )}
+
+        {/* Fullscreen Top Header (Auto-hides after 3.5s or single tap) */}
+        {isFullscreen && showFullscreenHeader && (
+          <View
+            style={[
+              styles.fullscreenHeaderRow,
+              Platform.OS === 'ios' && {
+                paddingLeft: Math.max(16, insets.left + 8),
+                paddingRight: Math.max(16, insets.right + 8),
+              },
+            ]}
+          >
+            <TouchableOpacity
+              style={styles.fullscreenBackBtn}
+              onPress={() => void toggleFullscreen(false)}
+              activeOpacity={0.7}
+            >
+              <Ionicons name="arrow-back" size={22} color="#FFFFFF" />
+            </TouchableOpacity>
+            <Text style={styles.fullscreenLessonTitle} numberOfLines={1}>
+              {lesson?.title || 'Lesson Video'}
+            </Text>
+            <View style={{ width: 38 }} />
+          </View>
+        )}
+
+        {/* Fullscreen Bottom Exit Button (Auto-hides along with header) */}
+        {isFullscreen && showFullscreenHeader && (
+          <View
+            style={[
+              styles.fullscreenBottomExitRow,
+              Platform.OS === 'ios' && {
+                right: Math.max(12, insets.right),
+                bottom: Math.max(10, insets.bottom),
+              },
+            ]}
+            pointerEvents="box-none"
+          >
+            <TouchableOpacity
+              style={styles.fullscreenExitBtn}
+              onPress={() => void toggleFullscreen(false)}
+              activeOpacity={0.8}
+            >
+              <Ionicons name="contract" size={24} color="#FFFFFF" />
+            </TouchableOpacity>
+          </View>
+        )}
+
         {/* Floating HUD Indicator (Brightness & Volume) */}
         {hudState.type && (
           <View pointerEvents="none" style={styles.hudOverlay}>
@@ -1183,28 +1392,6 @@ export const LessonPlayerScreen: React.FC<{ route: any; navigation: any }> = ({
               </View>
               <Text style={styles.hudPercentText}>{Math.round(hudState.value * 100)}%</Text>
             </View>
-          </View>
-        )}
-
-        {/* Fullscreen Bottom Exit Button (Auto-hides along with header) */}
-        {isFullscreen && showFullscreenHeader && (
-          <View
-            style={[
-              styles.fullscreenBottomExitRow,
-              Platform.OS === 'ios' && {
-                right: Math.max(12, insets.right),
-                bottom: Math.max(10, insets.bottom),
-              },
-            ]}
-            pointerEvents="box-none"
-          >
-            <TouchableOpacity
-              style={styles.fullscreenExitBtn}
-              onPress={() => void toggleFullscreen(false)}
-              activeOpacity={0.8}
-            >
-              <Ionicons name="contract" size={24} color="#FFFFFF" />
-            </TouchableOpacity>
           </View>
         )}
       </View>
@@ -1257,15 +1444,16 @@ export const LessonPlayerScreen: React.FC<{ route: any; navigation: any }> = ({
         </View>
       )}
 
-      {/* Content Scroll View */}
-      <ScrollView
-        style={styles.scrollContainer}
-        contentContainerStyle={[
-          styles.scrollContent,
-          { paddingBottom: insets.bottom + 40 },
-        ]}
-        showsVerticalScrollIndicator={false}
-      >
+      {/* Content Scroll View (Hidden in Fullscreen) */}
+      {!isFullscreen && (
+        <ScrollView
+          style={styles.scrollContainer}
+          contentContainerStyle={[
+            styles.scrollContent,
+            { paddingBottom: insets.bottom + 40 },
+          ]}
+          showsVerticalScrollIndicator={false}
+        >
         {/* Lesson Title & Provider Badge */}
         <View style={[styles.card, cardShadow(2)]}>
           <View style={styles.titleRow}>
@@ -1671,6 +1859,7 @@ export const LessonPlayerScreen: React.FC<{ route: any; navigation: any }> = ({
           </View>
         ) : null}
       </ScrollView>
+      )}
     </View>
   );
 };
@@ -2331,6 +2520,17 @@ const styles = StyleSheet.create({
     zIndex: 99999,
     backgroundColor: '#000000',
   },
+  fullscreenGestureLayer: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    width: '100%',
+    height: '100%',
+    zIndex: 40,
+    backgroundColor: 'rgba(0, 0, 0, 0.001)',
+  },
   fullscreenHeaderRow: {
     position: 'absolute',
     top: 0,
@@ -2341,7 +2541,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 16,
-    zIndex: 30,
+    zIndex: 50,
     backgroundColor: 'rgba(0,0,0,0.6)',
   },
   fullscreenBackBtn: {
