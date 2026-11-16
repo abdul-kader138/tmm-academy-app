@@ -979,7 +979,15 @@ export const LessonPlayerScreen: React.FC<{ route: any; navigation: any }> = ({
       >
         {/* Fullscreen Top Header (Auto-hides after 3.5s or single tap) */}
         {isFullscreen && showFullscreenHeader && (
-          <View style={styles.fullscreenHeaderRow}>
+          <View
+            style={[
+              styles.fullscreenHeaderRow,
+              Platform.OS === 'ios' && {
+                paddingLeft: Math.max(16, insets.left + 8),
+                paddingRight: Math.max(16, insets.right + 8),
+              },
+            ]}
+          >
             <TouchableOpacity
               style={styles.fullscreenBackBtn}
               onPress={() => void toggleFullscreen(false)}
@@ -1179,7 +1187,13 @@ export const LessonPlayerScreen: React.FC<{ route: any; navigation: any }> = ({
         {/* Fullscreen Bottom Exit Button (Auto-hides along with header) */}
         {isFullscreen && showFullscreenHeader && (
           <View
-            style={styles.fullscreenBottomExitRow}
+            style={[
+              styles.fullscreenBottomExitRow,
+              Platform.OS === 'ios' && {
+                right: Math.max(12, insets.right),
+                bottom: Math.max(10, insets.bottom),
+              },
+            ]}
             pointerEvents="box-none"
           >
             <TouchableOpacity
