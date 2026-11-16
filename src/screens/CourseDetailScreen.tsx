@@ -33,7 +33,6 @@ export const CourseDetailScreen: React.FC<{ route: any; navigation: any }> = ({
   const initialCourse: CourseCatalogItem = route.params?.course;
   const [detail, setDetail] = useState<CourseDetail | null>(null);
   const [loading, setLoading] = useState(true);
-  const [enrolling, setEnrolling] = useState(false);
   const [joiningSessionId, setJoiningSessionId] = useState<number | string | null>(null);
 
   useEffect(() => {
@@ -54,50 +53,6 @@ export const CourseDetailScreen: React.FC<{ route: any; navigation: any }> = ({
     : '';
 
   const pricing = getCoursePricing(course as any);
-
-  const handleEnroll = async () => {
-    if (!user) {
-      navigation.navigate('Login');
-      return;
-    }
-
-    if (pricing.isFree) {
-      setEnrolling(true);
-      try {
-        const res = await lmsApi.enrollCourse(course.slug);
-        if (res.success) {
-          Alert.alert('Enrolled Successfully!', `You are now enrolled in "${course.title}". Happy learning!`);
-          const updated = await lmsApi.getCourseDetail(course.slug);
-          if (updated) setDetail(updated);
-        } else {
-          Alert.alert('Notice', res.error || 'Could not enroll in course.');
-        }
-      } catch {
-        Alert.alert('Error', 'An error occurred while enrolling.');
-      } finally {
-        setEnrolling(false);
-      }
-    } else {
-      const priceText = pricing.hasDiscount && pricing.originalPrice
-        ? `${pricing.displayPrice} (Save ${pricing.discountBadgeText})`
-        : pricing.displayPrice;
-
-      Alert.alert(
-        'Enroll in Course',
-        `Ready to enroll in "${course.title}" for ${priceText}?`,
-        [
-          { text: 'Cancel', style: 'cancel' },
-          {
-            text: 'Proceed to Checkout',
-            onPress: () => {
-              const url = course.checkout_url || `https://academy.tmminnovation.com/courses/${course.slug}`;
-              void Linking.openURL(url);
-            },
-          },
-        ]
-      );
-    }
-  };
 
   const handleJoinLiveSession = async (sessionId: number | string, defaultJoinUrl?: string) => {
     setJoiningSessionId(sessionId);
@@ -297,10 +252,11 @@ export const CourseDetailScreen: React.FC<{ route: any; navigation: any }> = ({
                             lessonId: les.id,
                             courseTitle: course.title,
                           });
-                        } else if (!user) {
-                          navigation.navigate('Login');
                         } else {
-                          void handleEnroll();
+                          Alert.alert(
+                            'Course Enrollment',
+                            'Lessons are accessible for enrolled students. Enrollment is managed through the official academy website.'
+                          );
                         }
                       }}
                     >
@@ -410,11 +366,19 @@ export const CourseDetailScreen: React.FC<{ route: any; navigation: any }> = ({
           ) : !loading ? (
             <View style={styles.emptySyllabusCard}>
               <View style={styles.emptySyllabusIcon}>
-                <Ionicons name="film-outline" size={26} color={Colors.signal} />
+                <Ionicons
+                  name={course.is_enrolled ? 'film-outline' : 'lock-closed-outline'}
+                  size={26}
+                  color={Colors.signal}
+                />
               </View>
-              <Text style={styles.emptySyllabusTitle}>Modules Being Uploaded</Text>
+              <Text style={styles.emptySyllabusTitle}>
+                {course.is_enrolled ? 'Modules Being Uploaded' : 'Curriculum for Enrolled Students'}
+              </Text>
               <Text style={styles.emptySyllabusSub}>
-                The video syllabus and study materials for this course are being prepared by the academy instructors. Check back shortly!
+                {course.is_enrolled
+                  ? 'The video syllabus and study materials for this course are being prepared by the academy instructors. Check back shortly!'
+                  : 'Course lessons and study materials are accessible once enrollment is activated via the official web portal.'}
               </Text>
             </View>
           ) : null}
@@ -461,23 +425,20 @@ export const CourseDetailScreen: React.FC<{ route: any; navigation: any }> = ({
           </Text>
         </View>
 
-        <TouchableOpacity
-          style={[
-            styles.actionBtn,
-            course.access_expired
-              ? { backgroundColor: '#059669' }
-              : course.is_enrolled
-              ? { backgroundColor: Colors.signal }
-              : pricing.isFree
-              ? { backgroundColor: '#059669' }
-              : { backgroundColor: Colors.signal },
-          ]}
-          activeOpacity={0.85}
-          disabled={enrolling}
-          onPress={() => {
-            if (course.access_expired) {
-              navigation.navigate('MainTabs', { screen: 'CertificatesTab' });
-            } else if (course.is_enrolled) {
+        {course.access_expired ? (
+          <TouchableOpacity
+            style={[styles.actionBtn, { backgroundColor: '#059669' }]}
+            activeOpacity={0.85}
+            onPress={() => navigation.navigate('MainTabs', { screen: 'CertificatesTab' })}
+          >
+            <Text style={styles.actionBtnText}>View Certificate</Text>
+            <Ionicons name="ribbon" size={16} color="#FFFFFF" />
+          </TouchableOpacity>
+        ) : course.is_enrolled ? (
+          <TouchableOpacity
+            style={[styles.actionBtn, { backgroundColor: Colors.signal }]}
+            activeOpacity={0.85}
+            onPress={() => {
               // Find first incomplete lesson, or first lesson
               let targetLessonId: number | string | null = null;
               if (detail?.sections) {
@@ -499,38 +460,23 @@ export const CourseDetailScreen: React.FC<{ route: any; navigation: any }> = ({
               } else {
                 Alert.alert('Notice', 'No lessons available for this course yet.');
               }
-            } else if (user) {
-              void handleEnroll();
-            } else {
-              navigation.navigate('Login');
-            }
-          }}
-        >
-          {enrolling ? (
-            <ActivityIndicator size="small" color="#FFFFFF" />
-          ) : (
-            <>
-              <Text style={styles.actionBtnText}>
-                {course.access_expired
-                  ? 'View Certificate'
-                  : course.is_enrolled
-                  ? 'Go to Classroom'
-                  : !user
-                  ? 'Sign In to Enroll'
-                  : pricing.isFree
-                  ? 'Enroll for Free'
-                  : pricing.hasDiscount
-                  ? `Enroll • ${pricing.displayPrice} (${pricing.discountBadgeText})`
-                  : `Enroll • ${pricing.displayPrice}`}
-              </Text>
-              <Ionicons
-                name={course.access_expired ? 'ribbon' : 'arrow-forward'}
-                size={16}
-                color="#FFFFFF"
-              />
-            </>
-          )}
-        </TouchableOpacity>
+            }}
+          >
+            <Text style={styles.actionBtnText}>Go to Classroom</Text>
+            <Ionicons name="arrow-forward" size={16} color="#FFFFFF" />
+          </TouchableOpacity>
+        ) : (
+          <TouchableOpacity
+            style={styles.webAdmissionBtn}
+            activeOpacity={0.85}
+            onPress={() => {
+              void Linking.openURL(`https://academy.tmminnovation.com/courses/${course.slug}`);
+            }}
+          >
+            <Ionicons name="globe-outline" size={16} color={Colors.signal} />
+            <Text style={styles.webAdmissionBtnText}>Enroll via Web</Text>
+          </TouchableOpacity>
+        )}
       </View>
     </View>
   );
@@ -863,6 +809,22 @@ const styles = StyleSheet.create({
   contactSupportBtnText: {
     color: Colors.signal,
     fontSize: 12,
+    fontWeight: '700',
+  },
+  webAdmissionBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 12,
+    backgroundColor: '#F0FDFA',
+    borderWidth: 1,
+    borderColor: '#99F6E4',
+  },
+  webAdmissionBtnText: {
+    color: Colors.signal,
+    fontSize: 13,
     fontWeight: '700',
   },
 });
