@@ -165,7 +165,14 @@ class LmsApiClient {
    * 'Session store not set on request' errors in Laravel.
    */
   async ensureCsrf(forceRefresh = false): Promise<void> {
-    if (this.csrfInitialized && !forceRefresh && this.cookies.has('tmm-academy-session')) {
+    if (
+      this.csrfInitialized &&
+      !forceRefresh &&
+      (Boolean(this.xsrfToken) ||
+        this.cookies.has('laravel_session') ||
+        this.cookies.has('tmm_academy_session') ||
+        this.cookies.has('tmm-academy-session'))
+    ) {
       return;
     }
 

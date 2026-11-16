@@ -406,7 +406,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: Colors.borderSubtle,
     marginBottom: 20,
-    ...cardShadow,
+    ...cardShadow(2),
   },
   dangerCard: {
     borderColor: '#FEE2E2',

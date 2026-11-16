@@ -59,8 +59,15 @@ export const SupportTicketScreen: React.FC<{ navigation: any; route: any }> = ({
 
   const fetchCourses = useCallback(async () => {
     try {
-      const list = await lmsApi.getCourses();
-      setCourses(list.filter((c) => c.is_enrolled));
+      const [dash, list] = await Promise.all([
+        lmsApi.getDashboard().catch(() => null),
+        lmsApi.getCourses().catch(() => []),
+      ]);
+      if (dash?.enrolled_courses && dash.enrolled_courses.length > 0) {
+        setCourses(dash.enrolled_courses);
+      } else {
+        setCourses(list.filter((c) => c.is_enrolled));
+      }
     } catch {
       setCourses([]);
     }

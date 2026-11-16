@@ -31,13 +31,31 @@ export const LiveClassesScreen: React.FC<{ navigation: any; route: any }> = ({
   const fetchLiveClasses = useCallback(async () => {
     try {
       setLoading(true);
-      // Fetch enrolled courses to aggregate scheduled live classes
-      const courses = await lmsApi.getCourses();
+      // Fetch enrolled courses from dashboard (authoritative for learner) and catalog
+      const [dash, catalog] = await Promise.all([
+        lmsApi.getDashboard().catch(() => null),
+        lmsApi.getCourses().catch(() => []),
+      ]);
+
+      const enrolledList =
+        dash?.enrolled_courses && dash.enrolled_courses.length > 0
+          ? dash.enrolled_courses
+          : catalog.filter((c) => c.is_enrolled);
+
+      const targetCourses = enrolledList.length > 0 ? enrolledList : catalog;
       const allLive: LiveClassItem[] = [];
 
-      for (const c of courses) {
-        if (c.live_sessions && Array.isArray(c.live_sessions)) {
-          c.live_sessions.forEach((s: any) => {
+      for (const c of targetCourses) {
+        let sessions = c.live_sessions;
+        if ((!sessions || !Array.isArray(sessions) || sessions.length === 0) && c.slug) {
+          try {
+            const detail = await lmsApi.getCourseDetail(c.slug);
+            sessions = detail?.live_sessions || (detail as any)?.live_classes;
+          } catch {}
+        }
+
+        if (sessions && Array.isArray(sessions)) {
+          sessions.forEach((s: any) => {
             allLive.push({
               id: s.id,
               course_id: c.id,

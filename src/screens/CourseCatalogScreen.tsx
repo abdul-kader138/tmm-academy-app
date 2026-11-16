@@ -228,6 +228,16 @@ export const CourseCatalogScreen: React.FC<{ navigation: any }> = ({ navigation 
         ]}
       >
         <View style={styles.headerTopRow}>
+          {navigation?.canGoBack?.() && (
+            <TouchableOpacity
+              style={styles.headerBackBtn}
+              onPress={() => navigation.goBack()}
+              activeOpacity={0.7}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            >
+              <Ionicons name="arrow-back" size={22} color={Colors.textMain} />
+            </TouchableOpacity>
+          )}
           <View style={styles.headerTitleWrap}>
             <Text style={styles.screenTitle}>Explore Courses</Text>
             <Text style={styles.screenSubtitle}>Practical tracks for career advancement</Text>
@@ -304,6 +314,15 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: 8,
+  },
+  headerBackBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: Colors.surfaceElevated,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
   },
   headerTitleWrap: {
     flex: 1,

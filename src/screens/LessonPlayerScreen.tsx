@@ -607,6 +607,8 @@ export const LessonPlayerScreen: React.FC<{ route: any; navigation: any }> = ({
   useEffect(() => {
     return () => {
       Brightness.restoreSystemBrightnessAsync().catch(() => {});
+      if (hudTimerRef.current) clearTimeout(hudTimerRef.current);
+      if (headerTimerRef.current) clearTimeout(headerTimerRef.current);
     };
   }, []);
 
