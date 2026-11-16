@@ -1334,36 +1334,30 @@ export const LessonPlayerScreen: React.FC<{ route: any; navigation: any }> = ({
             </View>
           </View>
 
-          {/* Mark Complete CTA */}
-          <TouchableOpacity
-            style={[
-              styles.completeBtn,
-              isCompleted ? styles.completeBtnDone : styles.completeBtnActive,
-            ]}
-            onPress={handleMarkComplete}
-            disabled={completing || isCompleted}
-            activeOpacity={0.85}
-          >
-            {completing ? (
-              <ActivityIndicator size="small" color="#FFFFFF" />
-            ) : (
-              <>
-                <Ionicons
-                  name={isCompleted ? 'checkmark-done' : 'checkmark-circle-outline'}
-                  size={18}
-                  color={isCompleted ? Colors.emerald : '#FFFFFF'}
-                />
-                <Text
-                  style={[
-                    styles.completeBtnText,
-                    isCompleted && styles.completeBtnTextDone,
-                  ]}
-                >
-                  {isCompleted ? 'Lesson Completed' : 'Mark as Complete'}
-                </Text>
-              </>
-            )}
-          </TouchableOpacity>
+          {/* Mark Complete CTA - hidden once completed */}
+          {!isCompleted && (
+            <TouchableOpacity
+              style={[styles.completeBtn, styles.completeBtnActive]}
+              onPress={handleMarkComplete}
+              disabled={completing}
+              activeOpacity={0.85}
+            >
+              {completing ? (
+                <ActivityIndicator size="small" color="#FFFFFF" />
+              ) : (
+                <>
+                  <Ionicons
+                    name="checkmark-circle-outline"
+                    size={18}
+                    color="#FFFFFF"
+                  />
+                  <Text style={styles.completeBtnText}>
+                    Mark as Complete
+                  </Text>
+                </>
+              )}
+            </TouchableOpacity>
+          )}
 
           {/* Summary */}
           {lesson?.summary ? (
