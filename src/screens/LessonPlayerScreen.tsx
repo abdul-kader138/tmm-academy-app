@@ -933,37 +933,39 @@ export const LessonPlayerScreen: React.FC<{ route: any; navigation: any }> = ({
       )}
 
       {/* Top Navbar */}
-      <View
-        style={[
-          styles.navBar,
-          {
-            paddingTop: insets.top + (Platform.OS === 'ios' ? 8 : 12),
-          },
-        ]}
-      >
-        <TouchableOpacity
-          style={styles.backBtn}
-          onPress={() => navigation.goBack()}
-          activeOpacity={0.7}
+      {!isFullscreen && (
+        <View
+          style={[
+            styles.navBar,
+            {
+              paddingTop: insets.top + (Platform.OS === 'ios' ? 8 : 12),
+            },
+          ]}
         >
-          <Ionicons name="arrow-back" size={22} color="#FFFFFF" />
-        </TouchableOpacity>
-        <View style={styles.navTitleContainer}>
-          <Text style={styles.navCourseTitle} numberOfLines={1}>
-            {courseDetail?.title || initialTitle || 'Classroom'}
-          </Text>
-          <Text style={styles.navLessonCounter}>
-            {currentIndex >= 0 ? `Lesson ${currentIndex + 1} of ${allLessons.length}` : 'Lesson Player'}
-          </Text>
+          <TouchableOpacity
+            style={styles.backBtn}
+            onPress={() => navigation.goBack()}
+            activeOpacity={0.7}
+          >
+            <Ionicons name="arrow-back" size={22} color="#FFFFFF" />
+          </TouchableOpacity>
+          <View style={styles.navTitleContainer}>
+            <Text style={styles.navCourseTitle} numberOfLines={1}>
+              {courseDetail?.title || initialTitle || 'Classroom'}
+            </Text>
+            <Text style={styles.navLessonCounter}>
+              {currentIndex >= 0 ? `Lesson ${currentIndex + 1} of ${allLessons.length}` : 'Lesson Player'}
+            </Text>
+          </View>
+          <View style={{ width: 40 }} />
         </View>
-        <View style={{ width: 40 }} />
-      </View>
+      )}
 
       {/* Video Container (Fixed 16:9 or Fullscreen) */}
       <View
         style={[
           styles.videoPlayerContainer,
-          isFullscreen && styles.fullscreenContainer,
+          isFullscreen ? styles.fullscreenContainer : styles.portraitVideoRatio,
         ]}
         onLayout={(e) => {
           containerDimensionsRef.current = e.nativeEvent.layout;
@@ -1695,8 +1697,10 @@ const styles = StyleSheet.create({
   },
   videoPlayerContainer: {
     width: '100%',
-    aspectRatio: 16 / 9,
     backgroundColor: '#000000',
+  },
+  portraitVideoRatio: {
+    aspectRatio: 16 / 9,
   },
   webview: {
     flex: 1,
@@ -2300,6 +2304,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   fullscreenContainer: {
+    ...StyleSheet.absoluteFill,
     position: 'absolute',
     top: 0,
     left: 0,
@@ -2309,7 +2314,6 @@ const styles = StyleSheet.create({
     height: '100%',
     zIndex: 99999,
     backgroundColor: '#000000',
-    aspectRatio: undefined,
   },
   fullscreenHeaderRow: {
     position: 'absolute',
@@ -2341,14 +2345,14 @@ const styles = StyleSheet.create({
   },
   fullscreenBottomExitRow: {
     position: 'absolute',
-    bottom: 12,
-    right: 12,
-    zIndex: 40,
+    bottom: 10,
+    right: 10,
+    zIndex: 50,
   },
   fullscreenExitBtn: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     backgroundColor: 'rgba(0, 0, 0, 0.75)',
     justifyContent: 'center',
     alignItems: 'center',
