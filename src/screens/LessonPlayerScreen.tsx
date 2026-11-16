@@ -1177,13 +1177,7 @@ export const LessonPlayerScreen: React.FC<{ route: any; navigation: any }> = ({
         {/* Fullscreen Bottom Exit Button (Auto-hides along with header) */}
         {isFullscreen && showFullscreenHeader && (
           <View
-            style={[
-              styles.fullscreenBottomExitRow,
-              {
-                bottom: Math.max(16, insets.bottom + 12),
-                right: Math.max(20, insets.right + 14),
-              },
-            ]}
+            style={styles.fullscreenBottomExitRow}
             pointerEvents="box-none"
           >
             <TouchableOpacity
@@ -1191,7 +1185,7 @@ export const LessonPlayerScreen: React.FC<{ route: any; navigation: any }> = ({
               onPress={() => void toggleFullscreen(false)}
               activeOpacity={0.8}
             >
-              <Ionicons name="contract" size={22} color="#FFFFFF" />
+              <Ionicons name="contract" size={24} color="#FFFFFF" />
             </TouchableOpacity>
           </View>
         )}
@@ -2347,12 +2341,14 @@ const styles = StyleSheet.create({
   },
   fullscreenBottomExitRow: {
     position: 'absolute',
+    bottom: 12,
+    right: 12,
     zIndex: 40,
   },
   fullscreenExitBtn: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    width: 42,
+    height: 42,
+    borderRadius: 21,
     backgroundColor: 'rgba(0, 0, 0, 0.75)',
     justifyContent: 'center',
     alignItems: 'center',
