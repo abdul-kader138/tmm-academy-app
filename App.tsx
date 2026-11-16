@@ -28,7 +28,7 @@ function MainApp() {
         </AuthProvider>
       </AppErrorBoundary>
 
-      {/* Solid bottom strip matching page background so content never clashes behind Android navigation buttons */}
+      {/* Solid bottom strip matching bottom tab/surface (#FFFFFF) so content and navigation buttons seamlessly match */}
       {insets.bottom > 0 && (
         <View
           style={{
@@ -37,7 +37,7 @@ function MainApp() {
             left: 0,
             right: 0,
             height: insets.bottom,
-            backgroundColor: Colors.canvas,
+            backgroundColor: '#FFFFFF',
             zIndex: 9999,
             elevation: 9999,
           }}
