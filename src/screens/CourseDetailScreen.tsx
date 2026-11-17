@@ -21,6 +21,7 @@ import { lmsApi, API_BASE_URL } from '../api/lmsApi';
 import { CourseCatalogItem, CourseDetail } from '../api/types';
 import { getCoursePricing } from '../utils/pricing';
 import { cleanHtml } from '../utils/text';
+import { ShimmerImage } from '../components/ShimmerImage';
 
 export const CourseDetailScreen: React.FC<{ route: any; navigation: any }> = ({
   route,
@@ -81,12 +82,20 @@ export const CourseDetailScreen: React.FC<{ route: any; navigation: any }> = ({
 
       {/* Cover Header (Fixed at top) */}
       <View style={styles.coverWrapper}>
-        {Boolean(imageUrl) && (
-          <Image source={{ uri: imageUrl }} style={styles.coverImage} resizeMode="cover" />
+        {Boolean(imageUrl) ? (
+          <ShimmerImage
+            source={{ uri: imageUrl }}
+            style={styles.coverImage}
+            containerStyle={StyleSheet.absoluteFill}
+            resizeMode="cover"
+          />
+        ) : (
+          <View style={[StyleSheet.absoluteFill, { backgroundColor: '#E2E8F0' }]} />
         )}
         <LinearGradient
           colors={['rgba(15, 23, 42, 0.15)', 'rgba(15, 23, 42, 0.85)']}
           style={StyleSheet.absoluteFill}
+          pointerEvents="none"
         />
 
         {/* Top Status Bar Gradient Scrim (Smooth seamless fade) */}
@@ -484,6 +493,7 @@ const styles = StyleSheet.create({
     height: 260,
     position: 'relative',
     justifyContent: 'flex-end',
+    backgroundColor: '#E2E8F0',
   },
   topGradientScrim: {
     position: 'absolute',

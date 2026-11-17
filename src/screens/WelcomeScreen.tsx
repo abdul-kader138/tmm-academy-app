@@ -15,6 +15,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors, cardShadow } from '../theme/colors';
 import { useAuth } from '../context/AuthContext';
+import { ShimmerImage } from '../components/ShimmerImage';
 import { lmsApi, API_BASE_URL } from '../api/lmsApi';
 import { CourseCatalogItem } from '../api/types';
 import { cleanHtml } from '../utils/text';
@@ -271,9 +272,10 @@ export const WelcomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => 
                   activeOpacity={0.88}
                 >
                   {Boolean(imageUrl) ? (
-                    <Image
+                    <ShimmerImage
                       source={{ uri: imageUrl! }}
                       style={styles.trackCardImage}
+                      containerStyle={styles.trackCardImageContainer}
                       resizeMode="cover"
                     />
                   ) : null}
@@ -596,10 +598,14 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: Colors.borderSubtle,
   },
+  trackCardImageContainer: {
+    width: '100%',
+    height: 140,
+    backgroundColor: '#E2E8F0',
+  },
   trackCardImage: {
     width: '100%',
     height: 140,
-    backgroundColor: '#0F172A',
   },
   trackCardBody: {
     padding: 14,

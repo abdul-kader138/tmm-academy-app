@@ -20,6 +20,7 @@ import { CourseCatalogItem } from '../api/types';
 import { useAuth } from '../context/AuthContext';
 import { getCoursePricing } from '../utils/pricing';
 import { cleanHtml } from '../utils/text';
+import { ShimmerImage } from '../components/ShimmerImage';
 
 export const CourseCatalogScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   const insets = useSafeAreaInsets();
@@ -103,9 +104,10 @@ export const CourseCatalogScreen: React.FC<{ navigation: any }> = ({ navigation 
         {/* Cover Image */}
         <View style={styles.imageContainer}>
           {Boolean(imageUrl) ? (
-            <Image
+            <ShimmerImage
               source={{ uri: imageUrl! }}
               style={styles.coverImage}
+              containerStyle={StyleSheet.absoluteFill}
               resizeMode="cover"
             />
           ) : (
@@ -368,7 +370,7 @@ const styles = StyleSheet.create({
     position: 'relative',
     width: '100%',
     height: 155,
-    backgroundColor: '#0F172A',
+    backgroundColor: '#E2E8F0',
   },
   coverImage: {
     width: '100%',
