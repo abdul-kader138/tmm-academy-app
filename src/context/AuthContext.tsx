@@ -72,12 +72,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       try {
         await lmsApi.init();
         const token = lmsApi.getToken();
-        console.log('[AuthContext] Full startup token:', token);
         if (token) {
           const profilePromise = lmsApi.getAccount();
           const timeoutPromise = new Promise<null>((resolve) => setTimeout(() => resolve(null), 3500));
           const profile = await Promise.race([profilePromise, timeoutPromise]);
-          console.log('[AuthContext] Startup profile:', profile ? profile.email : 'NULL');
           if (isMounted && profile) setUser(profile);
         }
       } catch (e) {

@@ -262,15 +262,6 @@ function generateVideoHtml(parsed: ParsedVideo, rawCode?: string | null): string
             window.handlePlayerCommand = function(cmd) {
               try {
                 var iframe = document.getElementById('player_yt') || document.querySelector('iframe');
-                if (window.ReactNativeWebView && window.ReactNativeWebView.postMessage) {
-                  window.ReactNativeWebView.postMessage(JSON.stringify({
-                    type: 'HANDLE_CMD',
-                    action: cmd.action,
-                    volume: cmd.volume,
-                    hasIframe: !!iframe,
-                    hasYtPlayer: !!window.ytPlayer
-                  }));
-                }
 
                 if (cmd.action === 'setVolume') {
                   var vol = Math.max(0, Math.min(100, Math.round(cmd.volume * 100)));
@@ -918,7 +909,6 @@ export const LessonPlayerScreen: React.FC<{ route: any; navigation: any }> = ({
     setPlaybackError(null);
     try {
       const data = await lmsApi.getLesson(courseSlug, id);
-	  console.log('LESSON RAW:', JSON.stringify(data, null, 2));
       if (!data) {
         if (!user) {
           setFetchError('Please sign in to access your course video lessons.');
@@ -1231,14 +1221,6 @@ export const LessonPlayerScreen: React.FC<{ route: any; navigation: any }> = ({
               setSupportMultipleWindows={false}
               javaScriptCanOpenWindowsAutomatically={false}
               userAgent="Mozilla/5.0 (Linux; Android 14; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Mobile Safari/537.36"
-              onMessage={(syntheticEvent: any) => {
-                try {
-                  const data = JSON.parse(syntheticEvent.nativeEvent.data);
-                  console.log('[WebViewBridge]', data);
-                } catch {
-                  console.log('[WebViewBridgeRaw]', syntheticEvent.nativeEvent.data);
-                }
-              }}
               onError={(syntheticEvent: any) => {
                 const { nativeEvent } = syntheticEvent;
                 console.warn('[WebView Error]', nativeEvent);

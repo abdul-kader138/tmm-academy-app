@@ -456,19 +456,16 @@ class LmsApiClient {
   // ==========================================
   async getCourses(): Promise<CourseCatalogItem[]> {
     const res = await this.request<any>('/api/v1/courses');
-    console.log('[lmsApi] getCourses status:', res.status, 'hasData:', Boolean(res.data));
     if (!res.data) return [];
     let list: any[] = [];
     if (Array.isArray(res.data.courses)) list = res.data.courses;
     else if (Array.isArray(res.data.data)) list = res.data.data;
     else if (Array.isArray(res.data)) list = res.data;
-    console.log('[lmsApi] getCourses items:', list.map((c: any) => ({ id: c.id, title: c.title, is_enrolled: c.is_enrolled })));
     return list;
   }
 
   async getCourseDetail(courseSlug: string): Promise<CourseDetail | null> {
     const res = await this.request<any>(`/api/v1/courses/${courseSlug}`);
-    console.log('[lmsApi] getCourseDetail status:', res.status, 'for slug:', courseSlug, 'error:', res.error);
     if (!res.data) {
       if (res.status === 403) {
         // Course content is restricted. Check if student is not enrolled or if enrollment expired.
@@ -528,7 +525,6 @@ class LmsApiClient {
 
   async getDashboard(): Promise<DashboardSummary | null> {
     const res = await this.request<any>('/api/v1/dashboard');
-    console.log('[lmsApi] getDashboard status:', res.status, 'error:', res.error);
     if (!res.data) return null;
 
     const raw = res.data;
@@ -561,8 +557,6 @@ class LmsApiClient {
     } else if (Array.isArray(payload.courses)) {
       enrolled_courses = payload.courses;
     }
-
-    console.log('[lmsApi] getDashboard resolved enrolled_courses count:', enrolled_courses.length);
 
     const certificates: CertificateItem[] =
       payload.certificates ||
@@ -705,7 +699,6 @@ class LmsApiClient {
 
   async getCertificates(): Promise<CertificateItem[]> {
     const res = await this.request<any>('/api/v1/certificates');
-    console.log('[lmsApi] getCertificates status:', res.status, 'hasData:', Boolean(res.data));
     if (!res.data) return [];
     let list: any[] = [];
     if (Array.isArray(res.data.certificates)) list = res.data.certificates;
