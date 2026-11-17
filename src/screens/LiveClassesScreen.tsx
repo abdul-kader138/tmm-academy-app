@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
+import { useToast } from '../context/ToastContext';
 import {
   View,
   Text,
@@ -18,9 +19,10 @@ import { lmsApi } from '../api/lmsApi';
 import { CourseCatalogItem, LiveClassItem } from '../api/types';
 import { cleanHtml } from '../utils/text';
 
-export const LiveClassesScreen: React.FC<{ navigation: any; route: any }> = ({
+export const LiveClassesScreen: React.FC<{navigation: any; route: any}> = ({
   navigation,
 }) => {
+  const { showError, showSuccess, showWarning, showInfo } = useToast();
   const insets = useSafeAreaInsets();
 
   const [loading, setLoading] = useState(true);
@@ -99,7 +101,7 @@ export const LiveClassesScreen: React.FC<{ navigation: any; route: any }> = ({
           await Linking.openURL(url);
           return;
         } else if (res.error) {
-          Alert.alert('Live Session', res.error);
+          showWarning(res.error, 'Live Session');
           return;
         }
       }
@@ -107,13 +109,13 @@ export const LiveClassesScreen: React.FC<{ navigation: any; route: any }> = ({
       if (item.join_url) {
         await Linking.openURL(item.join_url);
       } else {
-        Alert.alert(
-          'Join Window',
-          'Live class links are activated 10 minutes before the scheduled start time. Please check back shortly.'
+        showInfo(
+          'Live class links are activated 10 minutes before the scheduled start time. Please check back shortly.',
+          'Join Window'
         );
       }
     } catch {
-      Alert.alert('Notice', 'Could not open live classroom.');
+      showError('Could not open live classroom.', 'Notice');
     } finally {
       setJoiningId(null);
     }

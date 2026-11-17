@@ -17,6 +17,7 @@ import * as Clipboard from 'expo-clipboard';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, cardShadow } from '../theme/colors';
 import { useAuth } from '../context/AuthContext';
+import { useToast } from '../context/ToastContext';
 import { TwoFactorSetupResponse } from '../api/types';
 
 const buildQrHtml = (
@@ -90,7 +91,8 @@ const buildQrHtml = (
 </html>`;
 };
 
-export const TwoFactorScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
+export const TwoFactorScreen: React.FC<{navigation: any}> = ({ navigation }) => {
+  const { showError, showSuccess, showWarning, showInfo } = useToast();
   const insets = useSafeAreaInsets();
   const { user, setup2FA, confirm2FA, disable2FA, regenerateRecoveryCodes, refreshUser } = useAuth();
 
@@ -125,10 +127,10 @@ export const TwoFactorScreen: React.FC<{ navigation: any }> = ({ navigation }) =
       if (res.success && res.data) {
         setSetupData(res.data);
       } else {
-        Alert.alert('Setup Error', res.error || 'Could not initiate 2FA setup.');
+        showError(res.error || 'Could not initiate 2FA setup.', 'Setup Error');
       }
     } catch (e: any) {
-      Alert.alert('Setup Error', e?.message || 'Network error initiating 2FA.');
+      showError(e?.message || 'Network error initiating 2FA.', 'Setup Error');
     } finally {
       setLoading(false);
     }
@@ -152,7 +154,7 @@ export const TwoFactorScreen: React.FC<{ navigation: any }> = ({ navigation }) =
     if (!setupData?.secret) return;
     const cleanCode = code.trim();
     if (cleanCode.length !== 6) {
-      Alert.alert('Invalid Code', 'Please enter the 6-digit code from your authenticator app.');
+      showWarning('Please enter the 6-digit code from your authenticator app.', 'Invalid Code');
       return;
     }
 
@@ -162,9 +164,9 @@ export const TwoFactorScreen: React.FC<{ navigation: any }> = ({ navigation }) =
       if (res.success && res.data) {
         setRecoveryCodes(res.data.recovery_codes || []);
         await refreshUser();
-        Alert.alert('2FA Enabled', 'Two-factor authentication has been activated.');
+        showSuccess('Two-factor authentication has been activated.', '2FA Enabled');
       } else {
-        Alert.alert('Verification Failed', res.error || 'Invalid authentication code.');
+        showError(res.error || 'Invalid authentication code.', 'Verification Failed');
       }
     } finally {
       setSubmitting(false);
@@ -173,7 +175,7 @@ export const TwoFactorScreen: React.FC<{ navigation: any }> = ({ navigation }) =
 
   const handleDisable = async () => {
     if (!disablePassword) {
-      Alert.alert('Password Required', 'Please enter your password to disable 2FA.');
+      showWarning('Please enter your password to disable 2FA.', 'Password Required');
       return;
     }
 
@@ -184,10 +186,10 @@ export const TwoFactorScreen: React.FC<{ navigation: any }> = ({ navigation }) =
         setShowDisableForm(false);
         setDisablePassword('');
         await refreshUser();
-        Alert.alert('2FA Disabled', 'Two-factor authentication has been turned off.');
+        showSuccess('Two-factor authentication has been turned off.', '2FA Disabled');
         await loadSetupData();
       } else {
-        Alert.alert('Error', res.error || 'Could not disable 2FA.');
+        showError(res.error || 'Could not disable 2FA.', 'Error');
       }
     } finally {
       setSubmitting(false);
@@ -196,7 +198,7 @@ export const TwoFactorScreen: React.FC<{ navigation: any }> = ({ navigation }) =
 
   const handleRegenerate = async () => {
     if (!regeneratePassword) {
-      Alert.alert('Password Required', 'Please enter your password to regenerate recovery codes.');
+      showWarning('Please enter your password to regenerate recovery codes.', 'Password Required');
       return;
     }
 
@@ -207,9 +209,9 @@ export const TwoFactorScreen: React.FC<{ navigation: any }> = ({ navigation }) =
         setShowRegenerateForm(false);
         setRegeneratePassword('');
         setRecoveryCodes(res.data.recovery_codes || []);
-        Alert.alert('Codes Regenerated', 'Your new backup recovery codes have been generated.');
+        showSuccess('Your new backup recovery codes have been generated.', 'Codes Regenerated');
       } else {
-        Alert.alert('Error', res.error || 'Could not regenerate codes.');
+        showError(res.error || 'Could not regenerate codes.', 'Error');
       }
     } finally {
       setSubmitting(false);

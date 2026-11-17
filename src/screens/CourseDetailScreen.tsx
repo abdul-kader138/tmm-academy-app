@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { useToast } from '../context/ToastContext';
 import {
   View,
   Text,
@@ -23,10 +24,11 @@ import { getCoursePricing } from '../utils/pricing';
 import { cleanHtml } from '../utils/text';
 import { ShimmerImage } from '../components/ShimmerImage';
 
-export const CourseDetailScreen: React.FC<{ route: any; navigation: any }> = ({
+export const CourseDetailScreen: React.FC<{route: any; navigation: any}> = ({
   route,
   navigation,
 }) => {
+  const { showError, showSuccess, showWarning, showInfo } = useToast();
   const insets = useSafeAreaInsets();
   const isFocused = useIsFocused();
   const initialCourse: CourseCatalogItem = route.params?.course;
@@ -61,15 +63,15 @@ export const CourseDetailScreen: React.FC<{ route: any; navigation: any }> = ({
       if (urlToOpen) {
         await Linking.openURL(urlToOpen);
       } else if (res.error) {
-        Alert.alert('Live Session', res.error);
+        showWarning(res.error || 'Live session is not currently available.', 'Live Session');
       } else {
-        Alert.alert('Notice', 'Live session link will be accessible 10 minutes before the scheduled start time.');
+        showInfo('Live session link will be accessible 10 minutes before the scheduled start time.', 'Notice');
       }
     } catch {
       if (defaultJoinUrl) {
         void Linking.openURL(defaultJoinUrl);
       } else {
-        Alert.alert('Notice', 'Live session link will open shortly.');
+        showSuccess('Live session link will open shortly.', 'Notice');
       }
     } finally {
       setJoiningSessionId(null);
@@ -260,9 +262,9 @@ export const CourseDetailScreen: React.FC<{ route: any; navigation: any }> = ({
                             courseTitle: course.title,
                           });
                         } else {
-                          Alert.alert(
-                            'Course Enrollment',
-                            'Lessons are accessible for enrolled students. Enrollment is managed through the official academy website.'
+                          showInfo(
+                            'Lessons are accessible for enrolled students. Enrollment is managed through the official academy website.',
+                            'Course Enrollment'
                           );
                         }
                       }}
@@ -465,7 +467,7 @@ export const CourseDetailScreen: React.FC<{ route: any; navigation: any }> = ({
                   courseTitle: course.title,
                 });
               } else {
-                Alert.alert('Notice', 'No lessons available for this course yet.');
+                showInfo('No lessons available for this course yet.', 'Notice');
               }
             }}
           >

@@ -15,9 +15,11 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, cardShadow } from '../theme/colors';
 import { useAuth } from '../context/AuthContext';
+import { useToast } from '../context/ToastContext';
 import { lmsApi } from '../api/lmsApi';
 
-export const AccountSecurityScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
+export const AccountSecurityScreen: React.FC<{navigation: any}> = ({ navigation }) => {
+  const { showError, showSuccess, showWarning, showInfo } = useToast();
   const insets = useSafeAreaInsets();
   const { changePassword, logout } = useAuth();
 
@@ -44,15 +46,15 @@ export const AccountSecurityScreen: React.FC<{ navigation: any }> = ({ navigatio
 
   const handleChangePassword = async () => {
     if (!currentPassword) {
-      Alert.alert('Validation Error', 'Please enter your current password.');
+      showWarning('Please enter your current password.', 'Validation Error');
       return;
     }
     if (newPassword.length < 8) {
-      Alert.alert('Validation Error', 'New password must be at least 8 characters long.');
+      showWarning('New password must be at least 8 characters long.', 'Validation Error');
       return;
     }
     if (newPassword !== confirmPassword) {
-      Alert.alert('Validation Error', 'New password and confirmation do not match.');
+      showWarning('New password and confirmation do not match.', 'Validation Error');
       return;
     }
     if (lock.current) return;
@@ -67,15 +69,15 @@ export const AccountSecurityScreen: React.FC<{ navigation: any }> = ({ navigatio
       });
 
       if (res.success) {
-        Alert.alert('Success', res.message || 'Your password has been updated successfully.');
+        showSuccess(res.message || 'Your password has been updated successfully.', 'Success');
         setCurrentPassword('');
         setNewPassword('');
         setConfirmPassword('');
       } else {
-        Alert.alert('Update Failed', res.error || 'Failed to update password. Please check your current password.');
+        showError(res.error || 'Failed to update password. Please check your current password.', 'Update Failed');
       }
     } catch (e: any) {
-      Alert.alert('Error', e?.message || 'A network error occurred.');
+      showError(e?.message || 'A network error occurred.', 'Error');
     } finally {
       lock.current = false;
       setPasswordBusy(false);
@@ -84,7 +86,7 @@ export const AccountSecurityScreen: React.FC<{ navigation: any }> = ({ navigatio
 
   const handleDeleteAccount = () => {
     if (!deletePassword) {
-      Alert.alert('Password Required', 'Please enter your current password to confirm account deletion.');
+      showWarning('Please enter your current password to confirm account deletion.', 'Password Required');
       return;
     }
 
@@ -104,16 +106,16 @@ export const AccountSecurityScreen: React.FC<{ navigation: any }> = ({ navigatio
               const res = await lmsApi.deleteAccount(deletePassword);
               if (res.success) {
                 await logout();
-                Alert.alert('Account Deleted', 'Your account has been deleted and anonymized.');
+                showSuccess('Your account has been deleted and anonymized.', 'Account Deleted');
                 navigation.reset({
                   index: 0,
                   routes: [{ name: 'Welcome' }],
                 });
               } else {
-                Alert.alert('Deletion Failed', res.error || 'Incorrect password or deletion could not be processed.');
+                showError(res.error || 'Incorrect password or deletion could not be processed.', 'Deletion Failed');
               }
             } catch (err: any) {
-              Alert.alert('Error', err?.message || 'Unable to delete account.');
+              showError(err?.message || 'Unable to delete account.', 'Error');
             } finally {
               lock.current = false;
               setDeleteBusy(false);

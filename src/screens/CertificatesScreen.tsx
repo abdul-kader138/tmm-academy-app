@@ -19,8 +19,10 @@ import { Colors, cardShadow } from '../theme/colors';
 import { lmsApi } from '../api/lmsApi';
 import { CertificateItem } from '../api/types';
 import { useAuth } from '../context/AuthContext';
+import { useToast } from '../context/ToastContext';
 
-export const CertificatesScreen: React.FC<{ navigation?: any }> = ({ navigation }) => {
+export const CertificatesScreen: React.FC<{navigation?: any}> = ({ navigation }) => {
+  const { showError, showSuccess, showWarning, showInfo } = useToast();
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
   const [certificates, setCertificates] = useState<CertificateItem[]>([]);
@@ -76,7 +78,7 @@ export const CertificatesScreen: React.FC<{ navigation?: any }> = ({ navigation 
   const handleDownload = async (cert: CertificateItem) => {
     const token = lmsApi.getToken();
     if (!token) {
-      Alert.alert('Authentication Required', 'Please sign in to download your certificate.');
+      showWarning('Please sign in to download your certificate.', 'Authentication Required');
       return;
     }
 
@@ -102,13 +104,13 @@ export const CertificatesScreen: React.FC<{ navigation?: any }> = ({ navigation 
             UTI: 'com.adobe.pdf',
           });
         } else {
-          Alert.alert('Downloaded', `Certificate saved to: ${downloadResult.uri}`);
+          showSuccess('Certificate PDF downloaded successfully.', 'Downloaded');
         }
       } else {
-        Alert.alert('Download Failed', `Server returned status ${downloadResult.status}`);
+        showError(`Server returned status ${downloadResult.status}`, 'Download Failed');
       }
     } catch (err: any) {
-      Alert.alert('Download Error', err.message || 'Could not download certificate PDF.');
+      showError(err.message || 'Could not download certificate PDF.', 'Download Error');
     } finally {
       setDownloadingId(null);
     }

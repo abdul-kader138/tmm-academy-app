@@ -29,6 +29,7 @@ import { Colors, cardShadow } from '../theme/colors';
 import { lmsApi, API_BASE_URL } from '../api/lmsApi';
 import { LessonDetail, CourseDetail, LessonAttachment } from '../api/types';
 import { useAuth } from '../context/AuthContext';
+import { useToast } from '../context/ToastContext';
 import { cleanHtml } from '../utils/text';
 
 // Safe volume manager resolver for standalone Android APK & graceful fallback in Expo Go
@@ -587,10 +588,11 @@ function generateVideoHtml(parsed: ParsedVideo, rawCode?: string | null): string
   return null;
 }
 
-export const LessonPlayerScreen: React.FC<{ route: any; navigation: any }> = ({
+export const LessonPlayerScreen: React.FC<{route: any; navigation: any}> = ({
   route,
   navigation,
 }) => {
+  const { showError, showSuccess, showWarning, showInfo } = useToast();
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
   const { courseSlug, lessonId: initialLessonId, courseTitle: initialTitle } = route.params || {};
@@ -942,10 +944,10 @@ export const LessonPlayerScreen: React.FC<{ route: any; navigation: any }> = ({
         setComments((prev) => [res.data, ...prev]);
         setNewCommentText('');
       } else {
-        Alert.alert('Notice', res.error || 'Could not post comment.');
+        showError(res.error || 'Could not post comment.', 'Notice');
       }
     } catch {
-      Alert.alert('Error', 'An unexpected error occurred while posting your comment.');
+      showError('An unexpected error occurred while posting your comment.', 'Error');
     } finally {
       setPostingComment(false);
     }
@@ -964,17 +966,17 @@ export const LessonPlayerScreen: React.FC<{ route: any; navigation: any }> = ({
     try {
       const res = await lmsApi.markLessonComplete(courseSlug, lesson.id);
       if (res.error) {
-        Alert.alert('Notice', res.error);
+        showInfo(res.error, 'Notice');
       } else {
         setIsCompleted(true);
-        Alert.alert('Lesson Completed!', 'Great job making progress in this course.');
+        showSuccess('Great job making progress in this course.', 'Lesson Completed!');
         if (courseSlug) {
           const updated = await lmsApi.getCourseDetail(courseSlug);
           if (updated) setCourseDetail(updated);
         }
       }
     } catch {
-      Alert.alert('Error', 'Could not mark lesson as complete.');
+      showError('Could not mark lesson as complete.', 'Error');
     } finally {
       setCompleting(false);
     }
@@ -1001,7 +1003,7 @@ export const LessonPlayerScreen: React.FC<{ route: any; navigation: any }> = ({
       }
 
       if (!downloadUrl) {
-        Alert.alert('Download Unavailable', 'No valid download link found for this resource.');
+        showWarning('No valid download link found for this resource.', 'Download Unavailable');
         return;
       }
 
@@ -1026,13 +1028,13 @@ export const LessonPlayerScreen: React.FC<{ route: any; navigation: any }> = ({
             UTI: filename.endsWith('.pdf') ? 'com.adobe.pdf' : undefined,
           });
         } else {
-          Alert.alert('Downloaded', `Saved successfully to: ${downloadResult.uri}`);
+          showSuccess('Course resource saved successfully.', 'Downloaded');
         }
       } else {
-        Alert.alert('Download Failed', `Server responded with status: ${downloadResult.status}`);
+        showError(`Server responded with status: ${downloadResult.status}`, 'Download Failed');
       }
     } catch (err: any) {
-      Alert.alert('Download Error', err.message || 'Could not download course resource.');
+      showError(err.message || 'Could not download course resource.', 'Download Error');
     } finally {
       setDownloadingAttachmentId(null);
     }

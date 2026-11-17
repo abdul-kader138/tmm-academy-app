@@ -17,10 +17,12 @@ import * as ImagePicker from 'expo-image-picker';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, cardShadow } from '../theme/colors';
 import { useAuth } from '../context/AuthContext';
+import { useToast } from '../context/ToastContext';
 import { lmsApi, normalizeAvatarUrl } from '../api/lmsApi';
 import { PhoneInputField, PhoneValue } from '../components/PhoneInputField';
 
-export const EditProfileScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
+export const EditProfileScreen: React.FC<{navigation: any}> = ({ navigation }) => {
+  const { showError, showSuccess, showWarning, showInfo } = useToast();
   const insets = useSafeAreaInsets();
   const { user, refreshUser, updateProfile, resendVerification, updateUser } = useAuth();
 
@@ -63,7 +65,7 @@ export const EditProfileScreen: React.FC<{ navigation: any }> = ({ navigation })
           try {
             const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
             if (status !== 'granted') {
-              Alert.alert('Permission Denied', 'Please grant photo library access.');
+              showWarning('Please grant photo library access.', 'Permission Denied');
               return;
             }
             const result = await ImagePicker.launchImageLibraryAsync({
@@ -76,7 +78,7 @@ export const EditProfileScreen: React.FC<{ navigation: any }> = ({ navigation })
               await uploadAvatarFile(result.assets[0].uri);
             }
           } catch (err: any) {
-            Alert.alert('Error', err?.message || 'Could not access photo library.');
+            showError(err?.message || 'Could not access photo library.', 'Error');
           }
         },
       },
@@ -86,7 +88,7 @@ export const EditProfileScreen: React.FC<{ navigation: any }> = ({ navigation })
           try {
             const { status } = await ImagePicker.requestCameraPermissionsAsync();
             if (status !== 'granted') {
-              Alert.alert('Permission Denied', 'Please grant camera access.');
+              showWarning('Please grant camera access.', 'Permission Denied');
               return;
             }
             const result = await ImagePicker.launchCameraAsync({
@@ -99,7 +101,7 @@ export const EditProfileScreen: React.FC<{ navigation: any }> = ({ navigation })
               await uploadAvatarFile(result.assets[0].uri);
             }
           } catch (err: any) {
-            Alert.alert('Error', err?.message || 'Could not access camera.');
+            showError(err?.message || 'Could not access camera.', 'Error');
           }
         },
       },
@@ -116,9 +118,9 @@ export const EditProfileScreen: React.FC<{ navigation: any }> = ({ navigation })
                     await updateUser({ avatar_url: null });
                     await refreshUser();
                     setAvatarLoadFailed(false);
-                    Alert.alert('Success', 'Profile photo removed.');
+                    showSuccess('Profile photo removed.', 'Success');
                   } else {
-                    Alert.alert('Error', res.error || 'Could not remove photo.');
+                    showError(res.error || 'Could not remove photo.', 'Error');
                   }
                 } finally {
                   setAvatarUploading(false);
@@ -141,9 +143,9 @@ export const EditProfileScreen: React.FC<{ navigation: any }> = ({ navigation })
         await updateUser({ avatar_url: returnedUrl });
         await refreshUser();
         setAvatarLoadFailed(false);
-        Alert.alert('Success', 'Profile photo updated successfully.');
+        showSuccess('Profile photo updated successfully.', 'Success');
       } else {
-        Alert.alert('Upload Failed', res.error || 'Could not upload photo.');
+        showError(res.error || 'Could not upload photo.', 'Upload Failed');
       }
     } finally {
       setAvatarUploading(false);
@@ -155,9 +157,9 @@ export const EditProfileScreen: React.FC<{ navigation: any }> = ({ navigation })
     try {
       const res = await resendVerification();
       if (res.success) {
-        Alert.alert('Verification Sent', res.message || 'Verification link has been sent to your email.');
+        showSuccess(res.message || 'Verification link has been sent to your email.', 'Verification Sent');
       } else {
-        Alert.alert('Error', res.error || 'Could not resend verification.');
+        showError(res.error || 'Could not resend verification.', 'Error');
       }
     } finally {
       setResendingEmail(false);
@@ -167,28 +169,28 @@ export const EditProfileScreen: React.FC<{ navigation: any }> = ({ navigation })
   const handleSave = async () => {
     // TMS-Wise Form Validations
     if (!firstName.trim() || firstName.trim().length < 2) {
-      Alert.alert('Invalid Name', 'First name must contain at least 2 letters.');
+      showWarning('First name must contain at least 2 letters.', 'Invalid Name');
       return;
     }
     if (!lastName.trim() || lastName.trim().length < 2) {
-      Alert.alert('Invalid Name', 'Last name must contain at least 2 letters.');
+      showWarning('Last name must contain at least 2 letters.', 'Invalid Name');
       return;
     }
 
     const namePattern = /^[\p{L}\s'-]+$/u;
     if (!namePattern.test(firstName.trim()) || !namePattern.test(lastName.trim())) {
-      Alert.alert('Invalid Name', 'First and last names can only contain alphabetic letters.');
+      showWarning('First and last names can only contain alphabetic letters.', 'Invalid Name');
       return;
     }
 
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!email.trim() || !emailRegex.test(email.trim())) {
-      Alert.alert('Invalid Email', 'Please enter a valid email address (e.g. name@example.com).');
+      showWarning('Please enter a valid email address (e.g. name@example.com).', 'Invalid Email');
       return;
     }
 
     if (phone.trim() && phoneValue && !phoneValue.isValid) {
-      Alert.alert('Invalid Phone', 'Please enter a valid phone number for the selected country code.');
+      showWarning('Please enter a valid phone number for the selected country code.', 'Invalid Phone');
       return;
     }
 
@@ -204,11 +206,10 @@ export const EditProfileScreen: React.FC<{ navigation: any }> = ({ navigation })
 
       if (res.success) {
         await refreshUser();
-        Alert.alert('Profile Saved', 'Your personal details have been saved successfully.', [
-          { text: 'OK', onPress: () => navigation.goBack() },
-        ]);
+        showSuccess('Your personal details have been saved successfully.', 'Profile Saved');
+        navigation.goBack();
       } else {
-        Alert.alert('Update Failed', res.error || 'Could not save profile details.');
+        showError(res.error || 'Could not save profile details.', 'Update Failed');
       }
     } finally {
       setSaving(false);

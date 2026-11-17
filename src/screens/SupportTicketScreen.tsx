@@ -20,10 +20,12 @@ import { Colors, cardShadow } from '../theme/colors';
 import { lmsApi } from '../api/lmsApi';
 import { SupportTicket, CourseCatalogItem } from '../api/types';
 import { useAuth } from '../context/AuthContext';
+import { useToast } from '../context/ToastContext';
 
-export const SupportTicketScreen: React.FC<{ navigation: any; route: any }> = ({
+export const SupportTicketScreen: React.FC<{navigation: any; route: any}> = ({
   navigation,
 }) => {
+  const { showError, showSuccess, showWarning, showInfo } = useToast();
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
 
@@ -85,11 +87,11 @@ export const SupportTicketScreen: React.FC<{ navigation: any; route: any }> = ({
 
   const handleCreateTicket = async () => {
     if (!newSubject.trim()) {
-      Alert.alert('Subject Required', 'Please enter a brief subject for your ticket.');
+      showWarning('Please enter a brief subject for your ticket.', 'Subject Required');
       return;
     }
     if (!newMessage.trim()) {
-      Alert.alert('Message Required', 'Please describe the problem or question in detail.');
+      showWarning('Please describe the problem or question in detail.', 'Message Required');
       return;
     }
 
@@ -103,7 +105,7 @@ export const SupportTicketScreen: React.FC<{ navigation: any; route: any }> = ({
       });
 
       if (res.success) {
-        Alert.alert('Ticket Submitted', 'Your ticket has been logged. Our team will review and reply promptly.');
+        showSuccess('Your ticket has been logged. Our team will review and reply promptly.', 'Ticket Submitted');
         setCreateModalVisible(false);
         setNewSubject('');
         setNewMessage('');
@@ -111,10 +113,10 @@ export const SupportTicketScreen: React.FC<{ navigation: any; route: any }> = ({
         setNewPriority('normal');
         void fetchTickets();
       } else {
-        Alert.alert('Error', res.error || 'Could not submit support ticket.');
+        showError(res.error || 'Could not submit support ticket.', 'Error');
       }
     } catch {
-      Alert.alert('Error', 'An unexpected network error occurred.');
+      showError('An unexpected network error occurred.', 'Error');
     } finally {
       setSubmitting(false);
     }
@@ -148,10 +150,10 @@ export const SupportTicketScreen: React.FC<{ navigation: any; route: any }> = ({
         }
         void fetchTickets();
       } else {
-        Alert.alert('Notice', res.error || 'Could not post reply.');
+        showError(res.error || 'Could not post reply.', 'Notice');
       }
     } catch {
-      Alert.alert('Error', 'An error occurred while sending your reply.');
+      showError('An error occurred while sending your reply.', 'Error');
     } finally {
       setReplying(false);
     }

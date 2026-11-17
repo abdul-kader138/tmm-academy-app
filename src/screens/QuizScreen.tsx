@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
+import { useToast } from '../context/ToastContext';
 import {
   View,
   Text,
@@ -17,7 +18,8 @@ import { lmsApi } from '../api/lmsApi';
 import { ActivityDetail } from '../api/types';
 import { cleanHtml } from '../utils/text';
 
-export const QuizScreen: React.FC<{ route: any; navigation: any }> = ({ route, navigation }) => {
+export const QuizScreen: React.FC<{route: any; navigation: any}> = ({ route, navigation }) => {
+  const { showError, showSuccess, showWarning, showInfo } = useToast();
   const insets = useSafeAreaInsets();
   const { courseSlug, activityId, activityTitle: initialTitle, courseTitle } = route.params || {};
 
@@ -93,10 +95,10 @@ export const QuizScreen: React.FC<{ route: any; navigation: any }> = ({ route, n
           message: res.message,
         });
       } else {
-        Alert.alert('Submission Failed', res.error || 'Could not submit answers.');
+        showError(res.error || 'Could not submit answers.', 'Submission Failed');
       }
     } catch {
-      Alert.alert('Error', 'An unexpected network error occurred.');
+      showError('An unexpected network error occurred.', 'Error');
     } finally {
       setSubmitting(false);
     }

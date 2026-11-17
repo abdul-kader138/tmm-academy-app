@@ -18,12 +18,14 @@ import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors, cardShadow } from '../theme/colors';
 import { useAuth } from '../context/AuthContext';
+import { useToast } from '../context/ToastContext';
 import { lmsApi } from '../api/lmsApi';
 import { PhoneInputField, PhoneValue } from '../components/PhoneInputField';
 
 type AuthMode = 'login' | 'register' | 'forgot_password';
 
-export const LoginScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
+export const LoginScreen: React.FC<{navigation: any}> = ({ navigation }) => {
+  const { showError, showSuccess, showWarning, showInfo } = useToast();
   const insets = useSafeAreaInsets();
   const { login, complete2FA, register, forgotPassword } = useAuth();
 
@@ -83,7 +85,7 @@ export const LoginScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
           await action(data.token);
         }
       } else if (data?.error) {
-        Alert.alert('Security Check Failed', 'Please try solving the security check again.');
+        showError('Please try solving the security check again.', 'Security Check Failed');
         setTurnstileVisible(false);
         setLoading(false);
       }
@@ -110,12 +112,12 @@ export const LoginScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
         setChallengeToken(res.challengeToken);
         setTwoFactorVisible(true);
       } else if (res.status === 403) {
-        Alert.alert(
-          'Email Verification Required',
-          'Please verify your email address before signing in. Check your inbox for the confirmation link.'
+        showWarning(
+          'Please verify your email address before signing in. Check your inbox for the confirmation link.',
+          'Email Verification Required'
         );
       } else {
-        Alert.alert('Sign In Failed', res.error || 'Please check your credentials.');
+        showError(res.error || 'Please check your credentials.', 'Sign In Failed');
       }
     } finally {
       setLoading(false);
@@ -138,13 +140,13 @@ export const LoginScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
       });
 
       if (res.success) {
-        Alert.alert(
-          'Account Created',
-          'We have sent a verification email to ' + email.trim() + '. Please click the link in your email to activate your account, then sign in.',
-          [{ text: 'OK', onPress: () => setMode('login') }]
+        setMode('login');
+        showSuccess(
+          'We have sent a verification email to ' + email.trim() + '. Please click the link to activate your account, then sign in.',
+          'Account Created'
         );
       } else {
-        Alert.alert('Registration Failed', res.error || 'Could not create account.');
+        showError(res.error || 'Could not create account.', 'Registration Failed');
       }
     } finally {
       setLoading(false);
@@ -155,7 +157,7 @@ export const LoginScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   const handleSubmit = async () => {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!email.trim() || !emailRegex.test(email.trim())) {
-      Alert.alert('Invalid Email', 'Please enter a valid email address (e.g. name@example.com).');
+      showWarning('Please enter a valid email address (e.g. name@example.com).', 'Invalid Email');
       return;
     }
 
@@ -164,11 +166,10 @@ export const LoginScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
       try {
         const res = await forgotPassword(email.trim());
         if (res.success) {
-          Alert.alert('Password Reset', res.message || 'If an account exists, a reset link was sent.', [
-            { text: 'Back to Sign In', onPress: () => setMode('login') },
-          ]);
+          setMode('login');
+          showSuccess(res.message || 'If an account exists, a reset link was sent.', 'Password Reset');
         } else {
-          Alert.alert('Error', res.error || 'Could not send reset link.');
+          showError(res.error || 'Could not send reset link.', 'Error');
         }
       } finally {
         setLoading(false);
@@ -178,41 +179,41 @@ export const LoginScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
 
     if (mode === 'register') {
       if (!firstName.trim() || firstName.trim().length < 2) {
-        Alert.alert('Invalid Name', 'First name must contain at least 2 letters.');
+        showWarning('First name must contain at least 2 letters.', 'Invalid Name');
         return;
       }
       if (!lastName.trim() || lastName.trim().length < 2) {
-        Alert.alert('Invalid Name', 'Last name must contain at least 2 letters.');
+        showWarning('Last name must contain at least 2 letters.', 'Invalid Name');
         return;
       }
       const namePattern = /^[\p{L}\s'-]+$/u;
       if (!namePattern.test(firstName.trim()) || !namePattern.test(lastName.trim())) {
-        Alert.alert('Invalid Name', 'First and last names can only contain alphabetic letters.');
+        showWarning('First and last names can only contain alphabetic letters.', 'Invalid Name');
         return;
       }
       if (phone.trim() && phoneValue && !phoneValue.isValid) {
-        Alert.alert('Invalid Phone', 'Please enter a valid phone number for the selected country code.');
+        showWarning('Please enter a valid phone number for the selected country code.', 'Invalid Phone');
         return;
       }
       if (!password) {
-        Alert.alert('Required Field', 'Please enter a password.');
+        showWarning('Please enter a password.', 'Required Field');
         return;
       }
       if (!passwordConfirmation) {
-        Alert.alert('Required Field', 'Please confirm your password.');
+        showWarning('Please confirm your password.', 'Required Field');
         return;
       }
       if (password !== passwordConfirmation) {
-        Alert.alert('Password Mismatch', 'The passwords do not match. Please ensure both passwords are identical.');
+        showWarning('The passwords do not match. Please ensure both passwords are identical.', 'Password Mismatch');
         return;
       }
       if (password.length < 8) {
-        Alert.alert('Password Requirement', 'Password must be at least 8 characters long.');
+        showWarning('Password must be at least 8 characters long.', 'Password Requirement');
         return;
       }
     } else {
       if (!password.trim()) {
-        Alert.alert('Required Field', 'Please enter your password.');
+        showWarning('Please enter your password.', 'Required Field');
         return;
       }
     }
@@ -239,7 +240,7 @@ export const LoginScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   // Handle 2FA Challenge Submit
   const handle2FASubmit = async () => {
     if (!totpCode.trim()) {
-      Alert.alert('Code Required', 'Please enter the 6-digit authenticator or recovery code.');
+      showWarning('Please enter the 6-digit authenticator or recovery code.', 'Code Required');
       return;
     }
 
@@ -250,7 +251,7 @@ export const LoginScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
         setTwoFactorVisible(false);
         navigation.reset({ index: 0, routes: [{ name: 'MainTabs' }] });
       } else {
-        Alert.alert('Verification Failed', res.error || 'Invalid code.');
+        showError(res.error || 'Invalid code.', 'Verification Failed');
       }
     } finally {
       setLoading(false);

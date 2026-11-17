@@ -16,9 +16,11 @@ import * as ImagePicker from 'expo-image-picker';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, cardShadow } from '../theme/colors';
 import { useAuth } from '../context/AuthContext';
+import { useToast } from '../context/ToastContext';
 import { lmsApi, normalizeAvatarUrl } from '../api/lmsApi';
 
-export const AccountScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
+export const AccountScreen: React.FC<{navigation: any}> = ({ navigation }) => {
+  const { showError, showSuccess, showWarning, showInfo } = useToast();
   const insets = useSafeAreaInsets();
   const { user, logout, resendVerification, refreshUser, updateUser } = useAuth();
 
@@ -44,7 +46,7 @@ export const AccountScreen: React.FC<{ navigation: any }> = ({ navigation }) => 
           try {
             const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
             if (status !== 'granted') {
-              Alert.alert('Permission Denied', 'Please grant photo library access to upload a picture.');
+              showWarning('Please grant photo library access to upload a picture.', 'Permission Denied');
               return;
             }
             const result = await ImagePicker.launchImageLibraryAsync({
@@ -57,7 +59,7 @@ export const AccountScreen: React.FC<{ navigation: any }> = ({ navigation }) => 
               await uploadAvatarFile(result.assets[0].uri);
             }
           } catch (err: any) {
-            Alert.alert('Error', err?.message || 'Could not access gallery.');
+            showError(err?.message || 'Could not access gallery.', 'Error');
           }
         },
       },
@@ -67,7 +69,7 @@ export const AccountScreen: React.FC<{ navigation: any }> = ({ navigation }) => 
           try {
             const { status } = await ImagePicker.requestCameraPermissionsAsync();
             if (status !== 'granted') {
-              Alert.alert('Permission Denied', 'Please grant camera access to take a photo.');
+              showWarning('Please grant camera access to take a photo.', 'Permission Denied');
               return;
             }
             const result = await ImagePicker.launchCameraAsync({
@@ -80,7 +82,7 @@ export const AccountScreen: React.FC<{ navigation: any }> = ({ navigation }) => 
               await uploadAvatarFile(result.assets[0].uri);
             }
           } catch (err: any) {
-            Alert.alert('Error', err?.message || 'Could not access camera.');
+            showError(err?.message || 'Could not access camera.', 'Error');
           }
         },
       },
@@ -97,9 +99,9 @@ export const AccountScreen: React.FC<{ navigation: any }> = ({ navigation }) => 
                     await updateUser({ avatar_url: null });
                     await refreshUser();
                     setAvatarLoadFailed(false);
-                    Alert.alert('Success', 'Profile photo removed.');
+                    showSuccess('Profile photo removed.', 'Success');
                   } else {
-                    Alert.alert('Error', res.error || 'Could not remove photo.');
+                    showError(res.error || 'Could not remove photo.', 'Error');
                   }
                 } finally {
                   setAvatarUploading(false);
@@ -122,12 +124,12 @@ export const AccountScreen: React.FC<{ navigation: any }> = ({ navigation }) => 
         await updateUser({ avatar_url: returnedUrl });
         await refreshUser();
         setAvatarLoadFailed(false);
-        Alert.alert('Success', 'Profile photo updated successfully.');
+        showSuccess('Profile photo updated successfully.', 'Success');
       } else {
-        Alert.alert('Upload Failed', res.error || 'Could not upload photo.');
+        showError(res.error || 'Could not upload photo.', 'Upload Failed');
       }
     } catch (e: any) {
-      Alert.alert('Upload Failed', e?.message || 'Could not upload photo.');
+      showError(e?.message || 'Could not upload photo.', 'Upload Failed');
     } finally {
       setAvatarUploading(false);
     }
@@ -137,12 +139,12 @@ export const AccountScreen: React.FC<{ navigation: any }> = ({ navigation }) => 
     try {
       const res = await resendVerification();
       if (res.success) {
-        Alert.alert('Verification Sent', res.message || 'Verification link sent to your email.');
+        showSuccess(res.message || 'Verification link sent to your email.', 'Verification Sent');
       } else {
-        Alert.alert('Error', res.error || 'Could not resend email.');
+        showError(res.error || 'Could not resend email.', 'Error');
       }
     } catch {
-      Alert.alert('Error', 'Connection error.');
+      showError('Connection error.', 'Error');
     }
   };
 
@@ -151,12 +153,12 @@ export const AccountScreen: React.FC<{ navigation: any }> = ({ navigation }) => 
     try {
       const res = await lmsApi.exportAccountData();
       if (res.success) {
-        Alert.alert(
-          'GDPR Data Export',
-          'Your account records, enrollment history, and certificates package have been generated according to EU GDPR standards.'
+        showSuccess(
+          'Your account records, enrollment history, and certificates package have been generated according to EU GDPR standards.',
+          'GDPR Data Export'
         );
       } else {
-        Alert.alert('Export Notice', res.error || 'Data export initiated.');
+        showInfo(res.error || 'Data export initiated.', 'Export Notice');
       }
     } finally {
       setExporting(false);
