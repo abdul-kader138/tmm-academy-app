@@ -375,7 +375,7 @@ export const SupportTicketScreen: React.FC<{navigation: any; route: any}> = ({
               <Text style={styles.inputLabel}>Subject *</Text>
               <TextInput
                 style={styles.textInput}
-                placeholder="e.g. Question about Lesson 3 quiz or certificate"
+                placeholder="Enter ticket subject"
                 placeholderTextColor="#94A3B8"
                 value={newSubject}
                 onChangeText={setNewSubject}

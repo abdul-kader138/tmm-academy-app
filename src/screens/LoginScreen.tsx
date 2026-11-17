@@ -157,7 +157,7 @@ export const LoginScreen: React.FC<{navigation: any}> = ({ navigation }) => {
   const handleSubmit = async () => {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!email.trim() || !emailRegex.test(email.trim())) {
-      showWarning('Please enter a valid email address (e.g. name@example.com).', 'Invalid Email');
+      showWarning('Please enter a valid email address.', 'Invalid Email');
       return;
     }
 
@@ -362,7 +362,7 @@ export const LoginScreen: React.FC<{navigation: any}> = ({ navigation }) => {
             <Ionicons name="mail-outline" size={18} color={Colors.textMuted} style={styles.inputIcon} />
             <TextInput
               style={styles.inputFieldInner}
-              placeholder="name@example.com"
+              placeholder="Enter your email"
               placeholderTextColor={Colors.textMuted}
               keyboardType="email-address"
               autoCapitalize="none"

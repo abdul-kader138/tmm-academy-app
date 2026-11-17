@@ -185,7 +185,7 @@ export const EditProfileScreen: React.FC<{navigation: any}> = ({ navigation }) =
 
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!email.trim() || !emailRegex.test(email.trim())) {
-      showWarning('Please enter a valid email address (e.g. name@example.com).', 'Invalid Email');
+      showWarning('Please enter a valid email address.', 'Invalid Email');
       return;
     }
 
@@ -391,7 +391,7 @@ export const EditProfileScreen: React.FC<{navigation: any}> = ({ navigation }) =
                   style={styles.input}
                   value={email}
                   onChangeText={setEmail}
-                  placeholder="your.email@example.com"
+                  placeholder="Enter your email"
                   placeholderTextColor={Colors.textMuted}
                   keyboardType="email-address"
                   autoCapitalize="none"
