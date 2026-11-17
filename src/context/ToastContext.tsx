@@ -1,12 +1,22 @@
-import React, { createContext, useContext, useState, useCallback, useRef } from 'react';
+import React, { createContext, useContext, useState, useCallback } from 'react';
 import { FloatingSnackbar, ToastOptions, ToastType } from '../components/FloatingSnackbar';
+
+interface ConfirmOptions {
+  title?: string;
+  message: string;
+  confirmText?: string;
+  cancelText?: string;
+  onConfirm: () => void;
+  onCancel?: () => void;
+}
 
 interface ToastContextValue {
   showToast: (options: ToastOptions) => void;
-  showError: (message: string, title?: string) => void;
-  showSuccess: (message: string, title?: string) => void;
-  showInfo: (message: string, title?: string) => void;
-  showWarning: (message: string, title?: string) => void;
+  showError: (message: string, title?: string, onConfirm?: () => void) => void;
+  showSuccess: (message: string, title?: string, onConfirm?: () => void) => void;
+  showInfo: (message: string, title?: string, onConfirm?: () => void) => void;
+  showWarning: (message: string, title?: string, onConfirm?: () => void) => void;
+  showConfirm: (options: ConfirmOptions) => void;
   hideToast: () => void;
 }
 
@@ -26,24 +36,36 @@ export const Toast = {
       globalToastRef.show(options);
     }
   },
-  error: (message: string, title: string = 'Notice') => {
+  error: (message: string, title: string = 'Notice', onConfirm?: () => void) => {
     if (globalToastRef) {
-      globalToastRef.show({ type: 'error', message, title });
+      globalToastRef.show({ type: 'error', message, title, onConfirm });
     }
   },
-  success: (message: string, title: string = 'Success') => {
+  success: (message: string, title: string = 'Success', onConfirm?: () => void) => {
     if (globalToastRef) {
-      globalToastRef.show({ type: 'success', message, title });
+      globalToastRef.show({ type: 'success', message, title, onConfirm });
     }
   },
-  info: (message: string, title: string = 'Notice') => {
+  info: (message: string, title: string = 'Notice', onConfirm?: () => void) => {
     if (globalToastRef) {
-      globalToastRef.show({ type: 'info', message, title });
+      globalToastRef.show({ type: 'info', message, title, onConfirm });
     }
   },
-  warning: (message: string, title: string = 'Warning') => {
+  warning: (message: string, title: string = 'Warning', onConfirm?: () => void) => {
     if (globalToastRef) {
-      globalToastRef.show({ type: 'warning', message, title });
+      globalToastRef.show({ type: 'warning', message, title, onConfirm });
+    }
+  },
+  confirm: (options: ConfirmOptions) => {
+    if (globalToastRef) {
+      globalToastRef.show({
+        title: options.title || 'Confirm',
+        message: options.message,
+        confirmText: options.confirmText || 'Confirm',
+        cancelText: options.cancelText || 'Cancel',
+        onConfirm: options.onConfirm,
+        onCancel: options.onCancel,
+      });
     }
   },
   hide: () => {
@@ -64,20 +86,31 @@ export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     setActiveToast({ ...options });
   }, []);
 
-  const showError = useCallback((message: string, title: string = 'Notice') => {
-    showToast({ type: 'error', message, title });
+  const showError = useCallback((message: string, title: string = 'Notice', onConfirm?: () => void) => {
+    showToast({ type: 'error', message, title, onConfirm });
   }, [showToast]);
 
-  const showSuccess = useCallback((message: string, title: string = 'Success') => {
-    showToast({ type: 'success', message, title });
+  const showSuccess = useCallback((message: string, title: string = 'Success', onConfirm?: () => void) => {
+    showToast({ type: 'success', message, title, onConfirm });
   }, [showToast]);
 
-  const showInfo = useCallback((message: string, title: string = 'Notice') => {
-    showToast({ type: 'info', message, title });
+  const showInfo = useCallback((message: string, title: string = 'Notice', onConfirm?: () => void) => {
+    showToast({ type: 'info', message, title, onConfirm });
   }, [showToast]);
 
-  const showWarning = useCallback((message: string, title: string = 'Warning') => {
-    showToast({ type: 'warning', message, title });
+  const showWarning = useCallback((message: string, title: string = 'Warning', onConfirm?: () => void) => {
+    showToast({ type: 'warning', message, title, onConfirm });
+  }, [showToast]);
+
+  const showConfirm = useCallback((options: ConfirmOptions) => {
+    showToast({
+      title: options.title || 'Confirm',
+      message: options.message,
+      confirmText: options.confirmText || 'Confirm',
+      cancelText: options.cancelText || 'Cancel',
+      onConfirm: options.onConfirm,
+      onCancel: options.onCancel,
+    });
   }, [showToast]);
 
   // Connect global ref
@@ -94,6 +127,7 @@ export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         showSuccess,
         showInfo,
         showWarning,
+        showConfirm,
         hideToast,
       }}
     >
@@ -106,13 +140,13 @@ export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 export const useToast = (): ToastContextValue => {
   const context = useContext(ToastContext);
   if (!context) {
-    // Graceful fallback if invoked outside ToastProvider
     return {
       showToast: Toast.show,
       showError: Toast.error,
       showSuccess: Toast.success,
       showInfo: Toast.info,
       showWarning: Toast.warning,
+      showConfirm: Toast.confirm,
       hideToast: Toast.hide,
     };
   }

@@ -1,18 +1,17 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   Animated,
   TouchableOpacity,
-  Keyboard,
-  Platform,
-  PanResponder,
+  TouchableWithoutFeedback,
   Dimensions,
+  Platform,
 } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Ionicons } from '@expo/vector-icons';
 import { cardShadow } from '../theme/colors';
+
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 export type ToastType = 'error' | 'success' | 'info' | 'warning';
 
@@ -21,6 +20,10 @@ export interface ToastOptions {
   title?: string;
   message: string;
   duration?: number;
+  confirmText?: string;
+  cancelText?: string;
+  onConfirm?: () => void;
+  onCancel?: () => void;
 }
 
 interface FloatingSnackbarProps {
@@ -28,251 +31,199 @@ interface FloatingSnackbarProps {
   onDismiss: () => void;
 }
 
+/**
+ * Modern Pop-up Modal Dialog (Option 3 style):
+ * - Clean centered modal card with soft rounded corners (20px)
+ * - Translucent backdrop overlay (dark slate blur)
+ * - Bold dark title & high-legibility slate description
+ * - Modern styled brand blue action button
+ * - Smooth spring pop-in & fade animation
+ */
 export const FloatingSnackbar: React.FC<FloatingSnackbarProps> = ({ toast, onDismiss }) => {
-  const insets = useSafeAreaInsets();
-  const [keyboardHeight, setKeyboardHeight] = useState(0);
-
-  const translateY = useRef(new Animated.Value(120)).current;
+  const scale = useRef(new Animated.Value(0.88)).current;
   const opacity = useRef(new Animated.Value(0)).current;
-  const dismissTimerRef = useRef<any>(null);
 
-  // Keyboard elevation handling
   useEffect(() => {
-    const showSub = Keyboard.addListener(
-      Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
-      (e) => {
-        setKeyboardHeight(e.endCoordinates.height);
-      }
-    );
-    const hideSub = Keyboard.addListener(
-      Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide',
-      () => {
-        setKeyboardHeight(0);
-      }
-    );
-
-    return () => {
-      showSub.remove();
-      hideSub.remove();
-    };
-  }, []);
-
-  // Animation on toast change
-  useEffect(() => {
-    if (dismissTimerRef.current) {
-      clearTimeout(dismissTimerRef.current);
-      dismissTimerRef.current = null;
-    }
-
     if (toast) {
-      // Animate In
+      scale.setValue(0.88);
+      opacity.setValue(0);
+
       Animated.parallel([
-        Animated.spring(translateY, {
-          toValue: 0,
-          friction: 8,
-          tension: 65,
+        Animated.spring(scale, {
+          toValue: 1,
+          friction: 7,
+          tension: 75,
           useNativeDriver: true,
         }),
         Animated.timing(opacity, {
           toValue: 1,
-          duration: 220,
+          duration: 180,
           useNativeDriver: true,
         }),
       ]).start();
-
-      const duration = toast.duration ?? 3200;
-      dismissTimerRef.current = setTimeout(() => {
-        handleDismiss();
-      }, duration);
-    } else {
-      // Animate Out
-      handleDismiss();
     }
-
-    return () => {
-      if (dismissTimerRef.current) clearTimeout(dismissTimerRef.current);
-    };
   }, [toast]);
 
-  const handleDismiss = () => {
-    if (dismissTimerRef.current) {
-      clearTimeout(dismissTimerRef.current);
-      dismissTimerRef.current = null;
-    }
-
+  const handleDismiss = (callback?: () => void) => {
     Animated.parallel([
-      Animated.timing(translateY, {
-        toValue: 120,
-        duration: 200,
+      Animated.timing(scale, {
+        toValue: 0.92,
+        duration: 140,
         useNativeDriver: true,
       }),
       Animated.timing(opacity, {
         toValue: 0,
-        duration: 180,
+        duration: 140,
         useNativeDriver: true,
       }),
     ]).start(() => {
       onDismiss();
+      if (callback) {
+        callback();
+      }
     });
   };
 
-  // Swipe down to dismiss
-  const panResponder = useRef(
-    PanResponder.create({
-      onStartShouldSetPanResponder: () => false,
-      onMoveShouldSetPanResponder: (_, gestureState) => gestureState.dy > 5,
-      onPanResponderMove: (_, gestureState) => {
-        if (gestureState.dy > 0) {
-          translateY.setValue(gestureState.dy);
-        }
-      },
-      onPanResponderRelease: (_, gestureState) => {
-        if (gestureState.dy > 40 || gestureState.vy > 0.5) {
-          handleDismiss();
-        } else {
-          Animated.spring(translateY, {
-            toValue: 0,
-            friction: 7,
-            useNativeDriver: true,
-          }).start();
-        }
-      },
-    })
-  ).current;
-
   if (!toast) return null;
 
-  const type = toast.type || 'info';
+  const defaultTitle = {
+    error: 'Notice',
+    success: 'Success',
+    warning: 'Warning',
+    info: 'Notice',
+  }[toast.type || 'info'];
 
-  const config = {
-    error: {
-      accentColor: '#DC2626',
-      badgeBg: '#FEE2E2',
-      iconName: 'alert-circle' as const,
-      defaultTitle: 'Notice',
-    },
-    success: {
-      accentColor: '#059669',
-      badgeBg: '#D1FAE5',
-      iconName: 'checkmark-circle' as const,
-      defaultTitle: 'Success',
-    },
-    warning: {
-      accentColor: '#D97706',
-      badgeBg: '#FEF3C7',
-      iconName: 'warning' as const,
-      defaultTitle: 'Warning',
-    },
-    info: {
-      accentColor: '#2563EB',
-      badgeBg: '#DBEAFE',
-      iconName: 'information-circle' as const,
-      defaultTitle: 'Notice',
-    },
-  }[type];
-
-  // Dynamic bottom offset
-  const bottomOffset = keyboardHeight > 0
-    ? keyboardHeight + 12
-    : Math.max(16, insets.bottom + 12);
+  const titleText = toast.title || defaultTitle;
 
   return (
-    <Animated.View
-      style={[
-        styles.wrapper,
-        {
-          bottom: bottomOffset,
-          transform: [{ translateY }],
-          opacity,
-        },
-      ]}
-      pointerEvents="box-none"
-    >
-      <View
+    <Animated.View style={[styles.backdrop, { opacity }]}>
+      {/* Backdrop touch to dismiss */}
+      <TouchableWithoutFeedback onPress={() => handleDismiss(toast.onCancel)}>
+        <View style={styles.backdropTouchArea} />
+      </TouchableWithoutFeedback>
+
+      {/* Centered Modal Card */}
+      <Animated.View
         style={[
-          styles.container,
+          styles.dialogCard,
           cardShadow(4),
-          { borderLeftColor: config.accentColor },
+          {
+            transform: [{ scale }],
+          },
         ]}
-        {...panResponder.panHandlers}
       >
-        <View style={[styles.iconBadge, { backgroundColor: config.badgeBg }]}>
-          <Ionicons name={config.iconName} size={22} color={config.accentColor} />
-        </View>
+        {/* Modal Title */}
+        <Text style={styles.title} numberOfLines={2}>
+          {titleText}
+        </Text>
 
-        <View style={styles.textContainer}>
-          {Boolean(toast.title) && (
-            <Text style={[styles.title, { color: config.accentColor }]} numberOfLines={1}>
-              {toast.title}
-            </Text>
+        {/* Modal Message */}
+        <Text style={styles.message}>
+          {toast.message}
+        </Text>
+
+        {/* Action Buttons */}
+        <View style={styles.buttonRow}>
+          {Boolean(toast.cancelText) && (
+            <TouchableOpacity
+              style={styles.cancelButton}
+              onPress={() => handleDismiss(toast.onCancel)}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.cancelButtonText}>{toast.cancelText}</Text>
+            </TouchableOpacity>
           )}
-          <Text style={styles.message} numberOfLines={3}>
-            {toast.message}
-          </Text>
-        </View>
 
-        <TouchableOpacity
-          style={styles.closeBtn}
-          onPress={handleDismiss}
-          hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
-          activeOpacity={0.7}
-        >
-          <Ionicons name="close" size={18} color="#94A3B8" />
-        </TouchableOpacity>
-      </View>
+          <TouchableOpacity
+            style={styles.confirmButton}
+            onPress={() => handleDismiss(toast.onConfirm)}
+            activeOpacity={0.8}
+          >
+            <Text style={styles.confirmButtonText}>
+              {toast.confirmText || 'OK'}
+            </Text>
+          </TouchableOpacity>
+        </View>
+      </Animated.View>
     </Animated.View>
   );
 };
 
 const styles = StyleSheet.create({
-  wrapper: {
+  backdrop: {
     position: 'absolute',
-    left: 16,
-    right: 16,
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(15, 23, 42, 0.65)',
     zIndex: 999999,
     elevation: 999999,
+    justifyContent: 'center',
     alignItems: 'center',
+    paddingHorizontal: 24,
   },
-  container: {
+  backdropTouchArea: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+  },
+  dialogCard: {
     width: '100%',
-    maxWidth: 500,
+    maxWidth: 310,
     backgroundColor: '#FFFFFF',
-    borderRadius: 14,
-    borderWidth: 1,
+    borderRadius: 20,
+    paddingTop: 22,
+    paddingBottom: 18,
+    paddingHorizontal: 22,
+    borderWidth: Platform.OS === 'android' ? 0.5 : 0,
     borderColor: '#E2E8F0',
-    borderLeftWidth: 5,
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: 14,
   },
-  iconBadge: {
-    width: 36,
-    height: 36,
+  title: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#0F172A',
+    marginBottom: 8,
+    letterSpacing: -0.2,
+  },
+  message: {
+    fontSize: 14,
+    fontWeight: '400',
+    color: '#475569',
+    lineHeight: 20,
+    marginBottom: 22,
+  },
+  buttonRow: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    alignItems: 'center',
+    gap: 10,
+  },
+  cancelButton: {
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    borderRadius: 10,
+  },
+  cancelButtonText: {
+    fontSize: 13.5,
+    fontWeight: '600',
+    color: '#64748B',
+  },
+  confirmButton: {
+    backgroundColor: '#2563EB',
+    paddingVertical: 9,
+    paddingHorizontal: 22,
     borderRadius: 10,
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 12,
+    minWidth: 70,
   },
-  textContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    paddingRight: 8,
-  },
-  title: {
-    fontSize: 13,
-    fontWeight: '700',
-    marginBottom: 2,
-    letterSpacing: 0.2,
-  },
-  message: {
+  confirmButtonText: {
     fontSize: 13.5,
-    fontWeight: '500',
-    color: '#1E293B',
-    lineHeight: 18,
-  },
-  closeBtn: {
-    padding: 4,
-    marginLeft: 4,
+    fontWeight: '700',
+    color: '#FFFFFF',
+    letterSpacing: 0.2,
   },
 });
