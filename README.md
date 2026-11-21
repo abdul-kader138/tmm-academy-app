@@ -11,3 +11,13 @@ TMM Academy is a modern, full-featured Learning Management System designed to em
 ## 🌿 Branching Strategy
 - `main`: Production-ready, stable releases.
 - `development`: Active feature development, integration, and continuous progress.
+
+---
+
+## 👥 Engineering & Credits
+
+- **Product:** TMM Academy App
+- **Project Lead & Architect:** **Abdul Kader**
+- **Lead Mobile Application Engineer:** **Tasnikur Sifat**
+- **Architecture:** React Native · Expo · TypeScript · React Navigation
+

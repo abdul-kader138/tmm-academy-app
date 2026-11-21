@@ -1,3 +1,10 @@
+/**
+ * TMM Academy - Mobile Application
+ * Project Lead: Abdul Kader
+ * Lead Mobile Application Engineer: Tasnikur Sifat
+ * Copyright © 2026 TMM Academy
+ */
+
 import React, { useEffect } from 'react';
 import { Platform, View } from 'react-native';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';

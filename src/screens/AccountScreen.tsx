@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -9,6 +9,7 @@ import {
   ActivityIndicator,
   Image,
   Platform,
+  Modal,
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -27,6 +28,80 @@ export const AccountScreen: React.FC<{navigation: any}> = ({ navigation }) => {
   const [avatarUploading, setAvatarUploading] = useState(false);
   const [avatarLoadFailed, setAvatarLoadFailed] = useState(false);
   const [exporting, setExporting] = useState(false);
+  const [devModalVisible, setDevModalVisible] = useState(false);
+  const tapCountRef = useRef(0);
+  const lastTapTimeRef = useRef(0);
+
+  const handleVersionTap = () => {
+    const now = Date.now();
+    if (now - lastTapTimeRef.current < 1600) {
+      tapCountRef.current += 1;
+    } else {
+      tapCountRef.current = 1;
+    }
+    lastTapTimeRef.current = now;
+
+    if (tapCountRef.current >= 13) {
+      tapCountRef.current = 0;
+      setDevModalVisible(true);
+    }
+  };
+
+  const renderDevModal = () => (
+    <Modal
+      visible={devModalVisible}
+      transparent
+      animationType="fade"
+      onRequestClose={() => setDevModalVisible(false)}
+    >
+      <View style={styles.devModalOverlay}>
+        <View style={styles.devModalCard}>
+          <View style={styles.devBadge}>
+            <Ionicons name="people-circle-outline" size={28} color={Colors.signal} />
+          </View>
+          <Text style={styles.devModalTitle}>Engineering & Credits</Text>
+          <Text style={styles.devModalSubtitle}>Core Team & Architecture</Text>
+
+          {/* Member 1: Abdul Kader */}
+          <View style={styles.devInfoBox}>
+            <View style={[styles.devAvatarPlaceholder, { backgroundColor: '#1E3A8A' }]}>
+              <Text style={styles.devAvatarText}>AK</Text>
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.devName}>Abdul Kader</Text>
+              <Text style={[styles.devRole, { color: '#2563EB' }]}>Project Lead & Architect</Text>
+              <Text style={styles.devSub}>Technical Direction · Product</Text>
+            </View>
+          </View>
+
+          {/* Member 2: Tasnikur Sifat */}
+          <View style={[styles.devInfoBox, { marginTop: 10 }]}>
+            <View style={styles.devAvatarPlaceholder}>
+              <Text style={styles.devAvatarText}>TS</Text>
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.devName}>Tasnikur Sifat</Text>
+              <Text style={styles.devRole}>Lead Mobile Application Engineer</Text>
+              <Text style={styles.devSub}>React Native · Architecture · UI/UX</Text>
+            </View>
+          </View>
+
+          <View style={styles.devMetaRow}>
+            <Ionicons name="sparkles" size={14} color={Colors.signal} />
+            <Text style={styles.devMetaText}>Crafted with precision & passion</Text>
+          </View>
+
+          <TouchableOpacity
+            style={styles.devCloseButton}
+            onPress={() => setDevModalVisible(false)}
+            activeOpacity={0.8}
+          >
+            <Text style={styles.devCloseButtonText}>Close</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    </Modal>
+  );
 
   useEffect(() => {
     setAvatarLoadFailed(false);
@@ -212,6 +287,16 @@ export const AccountScreen: React.FC<{navigation: any}> = ({ navigation }) => {
             <Ionicons name="arrow-forward" size={16} color="#FFFFFF" />
           </TouchableOpacity>
         </View>
+
+        <TouchableOpacity
+          style={[styles.versionContainer, { marginTop: 24 }]}
+          activeOpacity={0.8}
+          onPress={handleVersionTap}
+        >
+          <Text style={styles.versionText}>TMM Academy · Version 1.2.0</Text>
+          <Text style={styles.copyrightText}>© 2026 TMM Academy. All rights reserved.</Text>
+        </TouchableOpacity>
+        {renderDevModal()}
       </View>
     );
   }
@@ -472,7 +557,18 @@ export const AccountScreen: React.FC<{navigation: any}> = ({ navigation }) => {
         </TouchableOpacity>
       </View>
 
-      <View style={{ height: 48 }} />
+      {/* Subtle Version Footer */}
+      <TouchableOpacity
+        style={styles.versionContainer}
+        activeOpacity={0.8}
+        onPress={handleVersionTap}
+      >
+        <Text style={styles.versionText}>TMM Academy · Version 1.2.0</Text>
+        <Text style={styles.copyrightText}>© 2026 TMM Academy. All rights reserved.</Text>
+      </TouchableOpacity>
+
+      <View style={{ height: 32 }} />
+      {renderDevModal()}
     </ScrollView>
   );
 };
@@ -745,6 +841,128 @@ const styles = StyleSheet.create({
   guestSignInBtnText: {
     color: '#FFFFFF',
     fontSize: 15,
+    fontWeight: '700',
+  },
+  versionContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 20,
+    paddingVertical: 12,
+  },
+  versionText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: Colors.textMuted,
+    letterSpacing: 0.3,
+  },
+  copyrightText: {
+    fontSize: 11,
+    color: '#94A3B8',
+    marginTop: 3,
+  },
+  devModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(15, 23, 42, 0.65)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 24,
+  },
+  devModalCard: {
+    width: '100%',
+    maxWidth: 340,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 20,
+    padding: 24,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.2,
+    shadowRadius: 20,
+    elevation: 10,
+  },
+  devBadge: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    backgroundColor: '#ECFEFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 12,
+  },
+  devModalTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: '#0F172A',
+    letterSpacing: -0.3,
+  },
+  devModalSubtitle: {
+    fontSize: 12,
+    color: '#64748B',
+    marginTop: 2,
+    marginBottom: 16,
+  },
+  devInfoBox: {
+    width: '100%',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    backgroundColor: '#F8FAFC',
+    borderRadius: 14,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  devAvatarPlaceholder: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#0E7490',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  devAvatarText: {
+    color: '#FFFFFF',
+    fontWeight: '800',
+    fontSize: 16,
+  },
+  devName: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#0F172A',
+  },
+  devRole: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#0E7490',
+    marginTop: 1,
+  },
+  devSub: {
+    fontSize: 10.5,
+    color: '#64748B',
+    marginTop: 2,
+  },
+  devMetaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 14,
+    marginBottom: 18,
+  },
+  devMetaText: {
+    fontSize: 12,
+    color: '#0E7490',
+    fontWeight: '600',
+  },
+  devCloseButton: {
+    width: '100%',
+    backgroundColor: '#0F172A',
+    paddingVertical: 12,
+    borderRadius: 12,
+    alignItems: 'center',
+  },
+  devCloseButtonText: {
+    color: '#FFFFFF',
+    fontSize: 14,
     fontWeight: '700',
   },
 });

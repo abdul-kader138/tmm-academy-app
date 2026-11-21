@@ -46,5 +46,16 @@
     "@types/react": "~19.3.0",
     "typescript": "~6.0.3"
   },
+  "author": "Abdul Kader <abdul-kader138@users.noreply.github.com>",
+  "contributors": [
+    {
+      "name": "Abdul Kader",
+      "role": "Project Lead & Architect"
+    },
+    {
+      "name": "Tasnikur Sifat",
+      "role": "Lead Mobile Application Engineer"
+    }
+  ],
   "private": true
 }
